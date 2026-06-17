@@ -1,5 +1,5 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import { Permission } from '../auth/permissions';
+import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+import { Permission } from "../auth/permissions";
 
 export type Teacher = {
   id: string;
@@ -7,12 +7,12 @@ export type Teacher = {
   subject: string;
   phone: string;
   telegram: string;
-  gender: 'male' | 'female';
+  gender: "male" | "female";
   experienceYears: number;
   monthlySalary: number;
-  salaryType: 'fixed' | 'percentage';
+  salaryType: "fixed" | "percentage";
   salaryPercentage: number;
-  status: 'active' | 'inactive';
+  status: "active" | "inactive";
   note: string;
   groupsCount: number;
   createdAt: string;
@@ -22,7 +22,7 @@ export type Teacher = {
 export type TeacherFilters = {
   search?: string;
   subject?: string;
-  status?: Teacher['status'];
+  status?: Teacher["status"];
   page?: number;
   limit?: number;
 };
@@ -44,12 +44,12 @@ export type TeacherPayload = {
   subject: string;
   phone: string;
   telegram?: string;
-  gender: Teacher['gender'];
+  gender: Teacher["gender"];
   experienceYears: number;
   monthlySalary: number;
-  salaryType: Teacher['salaryType'];
+  salaryType: Teacher["salaryType"];
   salaryPercentage: number;
-  status: Teacher['status'];
+  status: Teacher["status"];
   note?: string;
 };
 
@@ -70,7 +70,7 @@ export type Group = {
   endedAt: string | null;
   note: string;
   studentsCount: number;
-  status: 'active' | 'inactive' | 'archived';
+  status: "active" | "inactive" | "archived";
   createdAt: string;
   updatedAt: string;
 };
@@ -82,13 +82,20 @@ export type GroupPriceHistory = {
   reason: string;
 };
 
-export type WeekDay = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
+export type WeekDay =
+  | "monday"
+  | "tuesday"
+  | "wednesday"
+  | "thursday"
+  | "friday"
+  | "saturday"
+  | "sunday";
 
 export type GroupFilters = {
   search?: string;
   subject?: string;
   teacherId?: string;
-  status?: Group['status'];
+  status?: Group["status"];
   isEnrollmentOpen?: boolean;
   page?: number;
   limit?: number;
@@ -106,7 +113,7 @@ export type GroupPayload = {
   monthlyPrice: number;
   priceChangeReason?: string;
   isEnrollmentOpen?: boolean;
-  status: Group['status'];
+  status: Group["status"];
   note?: string;
 };
 
@@ -120,8 +127,8 @@ export type Student = {
   groupId: string;
   group: Group | null;
   teacher: Teacher | null;
-  status: 'active' | 'inactive' | 'paused' | 'left';
-  paymentStatus: 'paid' | 'debt';
+  status: "active" | "inactive" | "paused" | "left";
+  paymentStatus: "paid" | "debt";
   advanceBalance: number;
   leftAt: string | null;
   enrollmentHistory: StudentEnrollmentHistory[];
@@ -142,9 +149,9 @@ export type StudentEnrollmentHistory = {
 export type StudentFilters = {
   search?: string;
   groupId?: string;
-  status?: Student['status'];
-  paymentStatus?: Student['paymentStatus'];
-  view?: 'current' | 'history';
+  status?: Student["status"];
+  paymentStatus?: Student["paymentStatus"];
+  view?: "current" | "history";
   page?: number;
   limit?: number;
 };
@@ -157,12 +164,18 @@ export type StudentPayload = {
   parentPhone?: string;
   groupId: string;
   allowClosedGroup?: boolean;
-  status: Student['status'];
-  paymentStatus: Student['paymentStatus'];
+  status: Student["status"];
+  paymentStatus: Student["paymentStatus"];
   note?: string;
 };
 
-export type PaymentMethod = 'cash' | 'card' | 'bank_transfer' | 'click' | 'payme' | 'other';
+export type PaymentMethod =
+  | "cash"
+  | "card"
+  | "bank_transfer"
+  | "click"
+  | "payme"
+  | "other";
 
 export type StudentMonthlyBalance = {
   id: string;
@@ -175,7 +188,7 @@ export type StudentMonthlyBalance = {
   paidAmount: number;
   debtAmount: number;
   advanceAppliedAmount: number;
-  status: 'unpaid' | 'partial' | 'paid' | 'overpaid';
+  status: "unpaid" | "partial" | "paid" | "overpaid";
   notes: string;
   createdAt: string;
   updatedAt: string;
@@ -187,10 +200,14 @@ export type Payment = {
   amount: number;
   method: PaymentMethod;
   paidAt: string;
-  allocations: { monthlyBalanceId: string | null; month: string; amount: number }[];
+  allocations: {
+    monthlyBalanceId: string | null;
+    month: string;
+    amount: number;
+  }[];
   advanceAmount: number;
   cashClosureId: string | null;
-  cashStatus: 'open' | 'pending_owner' | 'approved' | 'rejected';
+  cashStatus: "open" | "pending_owner" | "approved" | "rejected";
   note: string;
   createdAt: string;
   updatedAt: string;
@@ -204,7 +221,7 @@ export type CashClosure = {
   totalsByMethod: Partial<Record<PaymentMethod, number>>;
   paymentsCount: number;
   paymentIds: string[];
-  status: 'pending_owner' | 'approved' | 'rejected';
+  status: "pending_owner" | "approved" | "rejected";
   ownerNote: string;
   reviewedAt: string | null;
   createdAt: string;
@@ -213,11 +230,11 @@ export type CashClosure = {
 
 export type AppNotification = {
   id: string;
-  role: 'owner' | 'admin' | 'reception';
+  role: "owner" | "admin" | "reception";
   title: string;
   message: string;
-  type: 'cash_closure' | 'system';
-  status: 'unread' | 'read';
+  type: "cash_closure" | "system";
+  status: "unread" | "read";
   relatedId: string | null;
   closure: CashClosure | null;
   createdAt: string;
@@ -257,7 +274,7 @@ export type StudentPause = {
   startDate: string;
   endDate: string | null;
   reason: string;
-  status: 'active' | 'finished' | 'cancelled';
+  status: "active" | "finished" | "cancelled";
   createdAt: string;
   updatedAt: string;
 };
@@ -266,7 +283,7 @@ export type StudentFinance = {
   summary: {
     totalDebt: number;
     advanceBalance: number;
-    paymentStatus: Student['paymentStatus'];
+    paymentStatus: Student["paymentStatus"];
   };
   balances: StudentMonthlyBalance[];
   payments: Payment[];
@@ -324,7 +341,7 @@ export type ExpensesResponse = PaginatedResponse<Expense> & {
 
 export type DashboardActivity = {
   id: string;
-  type: 'payment' | 'expense' | 'advance' | 'salary_payment';
+  type: "payment" | "expense" | "advance" | "salary_payment";
   date: string;
   title: string;
   amount: number;
@@ -377,8 +394,20 @@ export type DashboardResponse = {
     salaryPayableAmount: number;
   };
   counts: {
-    students: { total: number; active: number; paused: number; inactive: number; left: number; debt: number };
-    groups: { total: number; active: number; inactive: number; archived: number };
+    students: {
+      total: number;
+      active: number;
+      paused: number;
+      inactive: number;
+      left: number;
+      debt: number;
+    };
+    groups: {
+      total: number;
+      active: number;
+      inactive: number;
+      archived: number;
+    };
     teachers: { total: number; active: number; inactive: number };
     employees: { total: number; active: number; inactive: number };
   };
@@ -409,11 +438,11 @@ export type Employee = {
   id: string;
   fullName: string;
   username: string;
-  role: 'owner' | 'employee' | 'teacher';
+  role: "owner" | "employee" | "teacher";
   teacherId: string | null;
   permissions: Permission[];
   monthlySalary: number;
-  status: 'active' | 'inactive';
+  status: "active" | "inactive";
   lastLoginAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -429,23 +458,23 @@ export type EmployeePayload = {
   fullName: string;
   username: string;
   password?: string;
-  role: Employee['role'];
+  role: Employee["role"];
   teacherId?: string | null;
   permissions: Permission[];
   monthlySalary: number;
-  status: Employee['status'];
+  status: Employee["status"];
 };
 
-export type SalaryTargetType = 'user' | 'teacher';
+export type SalaryTargetType = "user" | "teacher";
 
 export type EmployeeSalaryRecipient = {
   targetType: SalaryTargetType;
   targetId: string;
   fullName: string;
   role: string;
-  status: 'active' | 'inactive';
+  status: "active" | "inactive";
   monthlySalary: number;
-  salaryType: 'fixed' | 'percentage';
+  salaryType: "fixed" | "percentage";
   salaryPercentage: number;
   month: {
     salaryAmount: number;
@@ -476,7 +505,7 @@ export type EmployeeSalaryTransaction = {
   targetType: SalaryTargetType;
   targetId: string;
   month: string;
-  kind: 'salary' | 'advance' | 'salary_payment';
+  kind: "salary" | "advance" | "salary_payment";
   amount: number;
   paidAt: string;
   note: string;
@@ -507,7 +536,7 @@ export type EmployeeSalaryTransactionPayload = {
   targetType: SalaryTargetType;
   targetId: string;
   month: string;
-  kind: EmployeeSalaryTransaction['kind'];
+  kind: EmployeeSalaryTransaction["kind"];
   amount: number;
   note?: string;
 };
@@ -516,325 +545,409 @@ export type StudentPausePayload = {
   startDate: string;
   endDate?: string | null;
   reason?: string;
-  status?: StudentPause['status'];
+  status?: StudentPause["status"];
 };
 
-const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
+const baseUrl =
+  import.meta.env.VITE_API_BASE_URL ||
+  "https://blcxkb9j-4000.inc1.devtunnels.ms/api";
 
 export const api = createApi({
-  reducerPath: 'api',
+  reducerPath: "api",
   baseQuery: fetchBaseQuery({
     baseUrl,
     prepareHeaders: (headers) => {
-      const token = localStorage.getItem('sab_auth_token');
+      const token = localStorage.getItem("sab_auth_token");
 
       if (token) {
-        headers.set('Authorization', `Bearer ${token}`);
+        headers.set("Authorization", `Bearer ${token}`);
       }
 
       return headers;
     },
   }),
-  tagTypes: ['Teacher', 'Group', 'Student', 'Finance', 'PaymentsDashboard', 'Expense', 'Employee', 'EmployeeSalary', 'Dashboard', 'Notification'],
+  tagTypes: [
+    "Teacher",
+    "Group",
+    "Student",
+    "Finance",
+    "PaymentsDashboard",
+    "Expense",
+    "Employee",
+    "EmployeeSalary",
+    "Dashboard",
+    "Notification",
+  ],
   endpoints: (builder) => ({
     getDashboard: builder.query<DashboardResponse, { month?: string } | void>({
       query: (filters) => ({
-        url: '/dashboard',
+        url: "/dashboard",
         params: filters,
       }),
-      providesTags: [{ type: 'Dashboard', id: 'CURRENT' }],
+      providesTags: [{ type: "Dashboard", id: "CURRENT" }],
     }),
-    getTeachers: builder.query<PaginatedResponse<Teacher>, TeacherFilters | void>({
+    getTeachers: builder.query<
+      PaginatedResponse<Teacher>,
+      TeacherFilters | void
+    >({
       query: (filters) => ({
-        url: '/teachers',
+        url: "/teachers",
         params: filters,
       }),
       providesTags: (result) =>
         result
           ? [
-              ...result.data.map((teacher) => ({ type: 'Teacher' as const, id: teacher.id })),
-              { type: 'Teacher', id: 'LIST' },
+              ...result.data.map((teacher) => ({
+                type: "Teacher" as const,
+                id: teacher.id,
+              })),
+              { type: "Teacher", id: "LIST" },
             ]
-          : [{ type: 'Teacher', id: 'LIST' }],
+          : [{ type: "Teacher", id: "LIST" }],
     }),
     createTeacher: builder.mutation<Teacher, TeacherPayload>({
       query: (body) => ({
-        url: '/teachers',
-        method: 'POST',
+        url: "/teachers",
+        method: "POST",
         body,
       }),
-      invalidatesTags: [{ type: 'Teacher', id: 'LIST' }],
+      invalidatesTags: [{ type: "Teacher", id: "LIST" }],
     }),
-    updateTeacher: builder.mutation<Teacher, { id: string; body: TeacherPayload }>({
+    updateTeacher: builder.mutation<
+      Teacher,
+      { id: string; body: TeacherPayload }
+    >({
       query: ({ id, body }) => ({
         url: `/teachers/${id}`,
-        method: 'PUT',
+        method: "PUT",
         body,
       }),
       invalidatesTags: (_result, _error, arg) => [
-        { type: 'Teacher', id: arg.id },
-        { type: 'Teacher', id: 'LIST' },
+        { type: "Teacher", id: arg.id },
+        { type: "Teacher", id: "LIST" },
       ],
     }),
     deleteTeacher: builder.mutation<{ message: string; id: string }, string>({
       query: (id) => ({
         url: `/teachers/${id}`,
-        method: 'DELETE',
+        method: "DELETE",
       }),
-      invalidatesTags: [{ type: 'Teacher', id: 'LIST' }],
+      invalidatesTags: [{ type: "Teacher", id: "LIST" }],
     }),
     getGroups: builder.query<PaginatedResponse<Group>, GroupFilters | void>({
       query: (filters) => ({
-        url: '/groups',
+        url: "/groups",
         params: filters,
       }),
       providesTags: (result) =>
         result
-          ? [...result.data.map((group) => ({ type: 'Group' as const, id: group.id })), { type: 'Group', id: 'LIST' }]
-          : [{ type: 'Group', id: 'LIST' }],
+          ? [
+              ...result.data.map((group) => ({
+                type: "Group" as const,
+                id: group.id,
+              })),
+              { type: "Group", id: "LIST" },
+            ]
+          : [{ type: "Group", id: "LIST" }],
     }),
     createGroup: builder.mutation<Group, GroupPayload>({
       query: (body) => ({
-        url: '/groups',
-        method: 'POST',
+        url: "/groups",
+        method: "POST",
         body,
       }),
       invalidatesTags: [
-        { type: 'Group', id: 'LIST' },
-        { type: 'Teacher', id: 'LIST' },
+        { type: "Group", id: "LIST" },
+        { type: "Teacher", id: "LIST" },
       ],
     }),
     updateGroup: builder.mutation<Group, { id: string; body: GroupPayload }>({
       query: ({ id, body }) => ({
         url: `/groups/${id}`,
-        method: 'PUT',
+        method: "PUT",
         body,
       }),
       invalidatesTags: (_result, _error, arg) => [
-        { type: 'Group', id: arg.id },
-        { type: 'Group', id: 'LIST' },
-        { type: 'Teacher', id: 'LIST' },
+        { type: "Group", id: arg.id },
+        { type: "Group", id: "LIST" },
+        { type: "Teacher", id: "LIST" },
       ],
     }),
     deleteGroup: builder.mutation<{ message: string; id: string }, string>({
       query: (id) => ({
         url: `/groups/${id}`,
-        method: 'DELETE',
+        method: "DELETE",
       }),
       invalidatesTags: [
-        { type: 'Group', id: 'LIST' },
-        { type: 'Teacher', id: 'LIST' },
+        { type: "Group", id: "LIST" },
+        { type: "Teacher", id: "LIST" },
       ],
     }),
-    getStudents: builder.query<PaginatedResponse<Student>, StudentFilters | void>({
+    getStudents: builder.query<
+      PaginatedResponse<Student>,
+      StudentFilters | void
+    >({
       query: (filters) => ({
-        url: '/students',
+        url: "/students",
         params: filters,
       }),
       providesTags: (result) =>
         result
           ? [
-              ...result.data.map((student) => ({ type: 'Student' as const, id: student.id })),
-              { type: 'Student', id: 'LIST' },
+              ...result.data.map((student) => ({
+                type: "Student" as const,
+                id: student.id,
+              })),
+              { type: "Student", id: "LIST" },
             ]
-          : [{ type: 'Student', id: 'LIST' }],
+          : [{ type: "Student", id: "LIST" }],
     }),
     createStudent: builder.mutation<Student, StudentPayload>({
       query: (body) => ({
-        url: '/students',
-        method: 'POST',
+        url: "/students",
+        method: "POST",
         body,
       }),
       invalidatesTags: [
-        { type: 'Student', id: 'LIST' },
-        { type: 'Group', id: 'LIST' },
+        { type: "Student", id: "LIST" },
+        { type: "Group", id: "LIST" },
       ],
     }),
-    updateStudent: builder.mutation<Student, { id: string; body: StudentPayload }>({
+    updateStudent: builder.mutation<
+      Student,
+      { id: string; body: StudentPayload }
+    >({
       query: ({ id, body }) => ({
         url: `/students/${id}`,
-        method: 'PUT',
+        method: "PUT",
         body,
       }),
       invalidatesTags: (_result, _error, arg) => [
-        { type: 'Student', id: arg.id },
-        { type: 'Student', id: 'LIST' },
-        { type: 'Group', id: 'LIST' },
+        { type: "Student", id: arg.id },
+        { type: "Student", id: "LIST" },
+        { type: "Group", id: "LIST" },
       ],
     }),
     deleteStudent: builder.mutation<{ message: string; id: string }, string>({
       query: (id) => ({
         url: `/students/${id}`,
-        method: 'DELETE',
+        method: "DELETE",
       }),
       invalidatesTags: [
-        { type: 'Student', id: 'LIST' },
-        { type: 'Group', id: 'LIST' },
+        { type: "Student", id: "LIST" },
+        { type: "Group", id: "LIST" },
       ],
     }),
     getStudentFinance: builder.query<StudentFinance, string>({
       query: (studentId) => `/finance/students/${studentId}`,
-      providesTags: (_result, _error, studentId) => [{ type: 'Finance', id: studentId }],
-    }),
-    createPayment: builder.mutation<Payment, { studentId: string; body: PaymentPayload }>({
-      query: ({ studentId, body }) => ({
-        url: `/finance/students/${studentId}/payments`,
-        method: 'POST',
-        body,
-      }),
-      invalidatesTags: (_result, _error, arg) => [
-        { type: 'Finance', id: arg.studentId },
-        { type: 'Finance', id: 'DEBTORS' },
-        { type: 'PaymentsDashboard', id: 'CURRENT' },
-        { type: 'Dashboard', id: 'CURRENT' },
-        { type: 'Student', id: arg.studentId },
-        { type: 'Student', id: 'LIST' },
+      providesTags: (_result, _error, studentId) => [
+        { type: "Finance", id: studentId },
       ],
     }),
-    createStudentPause: builder.mutation<StudentPause, { studentId: string; body: StudentPausePayload }>({
+    createPayment: builder.mutation<
+      Payment,
+      { studentId: string; body: PaymentPayload }
+    >({
       query: ({ studentId, body }) => ({
-        url: `/finance/students/${studentId}/pauses`,
-        method: 'POST',
+        url: `/finance/students/${studentId}/payments`,
+        method: "POST",
         body,
       }),
       invalidatesTags: (_result, _error, arg) => [
-        { type: 'Finance', id: arg.studentId },
-        { type: 'Finance', id: 'DEBTORS' },
-        { type: 'Dashboard', id: 'CURRENT' },
-        { type: 'Student', id: arg.studentId },
-        { type: 'Student', id: 'LIST' },
+        { type: "Finance", id: arg.studentId },
+        { type: "Finance", id: "DEBTORS" },
+        { type: "PaymentsDashboard", id: "CURRENT" },
+        { type: "Dashboard", id: "CURRENT" },
+        { type: "Student", id: arg.studentId },
+        { type: "Student", id: "LIST" },
+      ],
+    }),
+    createStudentPause: builder.mutation<
+      StudentPause,
+      { studentId: string; body: StudentPausePayload }
+    >({
+      query: ({ studentId, body }) => ({
+        url: `/finance/students/${studentId}/pauses`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, arg) => [
+        { type: "Finance", id: arg.studentId },
+        { type: "Finance", id: "DEBTORS" },
+        { type: "Dashboard", id: "CURRENT" },
+        { type: "Student", id: arg.studentId },
+        { type: "Student", id: "LIST" },
       ],
     }),
     activatePausedStudent: builder.mutation<{ message: string }, string>({
       query: (studentId) => ({
         url: `/finance/students/${studentId}/activate`,
-        method: 'POST',
+        method: "POST",
       }),
       invalidatesTags: (_result, _error, studentId) => [
-        { type: 'Finance', id: studentId },
-        { type: 'Finance', id: 'DEBTORS' },
-        { type: 'Dashboard', id: 'CURRENT' },
-        { type: 'Student', id: studentId },
-        { type: 'Student', id: 'LIST' },
+        { type: "Finance", id: studentId },
+        { type: "Finance", id: "DEBTORS" },
+        { type: "Dashboard", id: "CURRENT" },
+        { type: "Student", id: studentId },
+        { type: "Student", id: "LIST" },
       ],
     }),
     getPaymentsDashboard: builder.query<PaymentsDashboard, void>({
-      query: () => '/finance/payments-dashboard',
-      providesTags: [{ type: 'PaymentsDashboard', id: 'CURRENT' }],
+      query: () => "/finance/payments-dashboard",
+      providesTags: [{ type: "PaymentsDashboard", id: "CURRENT" }],
     }),
     getNotifications: builder.query<{ data: AppNotification[] }, void>({
-      query: () => '/notifications',
-      providesTags: [{ type: 'Notification', id: 'LIST' }],
+      query: () => "/notifications",
+      providesTags: [{ type: "Notification", id: "LIST" }],
     }),
     markNotificationRead: builder.mutation<AppNotification, string>({
       query: (notificationId) => ({
         url: `/notifications/${notificationId}/read`,
-        method: 'PUT',
+        method: "PUT",
       }),
-      invalidatesTags: [{ type: 'Notification', id: 'LIST' }],
+      invalidatesTags: [{ type: "Notification", id: "LIST" }],
     }),
     getDebtors: builder.query<{ data: Debtor[] }, void>({
-      query: () => '/finance/debtors',
-      providesTags: [{ type: 'Finance', id: 'DEBTORS' }],
+      query: () => "/finance/debtors",
+      providesTags: [{ type: "Finance", id: "DEBTORS" }],
     }),
     closeCashRegister: builder.mutation<CashClosure, void>({
       query: () => ({
-        url: '/finance/cash-closures',
-        method: 'POST',
+        url: "/finance/cash-closures",
+        method: "POST",
       }),
       invalidatesTags: [
-        { type: 'PaymentsDashboard', id: 'CURRENT' },
-        { type: 'Finance', id: 'LIST' },
-        { type: 'Notification', id: 'LIST' },
+        { type: "PaymentsDashboard", id: "CURRENT" },
+        { type: "Finance", id: "LIST" },
+        { type: "Notification", id: "LIST" },
       ],
     }),
-    reviewCashClosure: builder.mutation<CashClosure, { closureId: string; status: CashClosure['status']; ownerNote?: string }>({
+    reviewCashClosure: builder.mutation<
+      CashClosure,
+      { closureId: string; status: CashClosure["status"]; ownerNote?: string }
+    >({
       query: ({ closureId, status, ownerNote }) => ({
         url: `/finance/cash-closures/${closureId}/review`,
-        method: 'PUT',
+        method: "PUT",
         body: { status, ownerNote },
       }),
-      invalidatesTags: [{ type: 'PaymentsDashboard', id: 'CURRENT' }, { type: 'Notification', id: 'LIST' }],
+      invalidatesTags: [
+        { type: "PaymentsDashboard", id: "CURRENT" },
+        { type: "Notification", id: "LIST" },
+      ],
     }),
     getExpenses: builder.query<ExpensesResponse, ExpenseFilters | void>({
       query: (filters) => ({
-        url: '/expenses',
+        url: "/expenses",
         params: filters,
       }),
       providesTags: (result) =>
         result
           ? [
-              ...result.data.map((expense) => ({ type: 'Expense' as const, id: expense.id })),
-              { type: 'Expense', id: 'LIST' },
+              ...result.data.map((expense) => ({
+                type: "Expense" as const,
+                id: expense.id,
+              })),
+              { type: "Expense", id: "LIST" },
             ]
-          : [{ type: 'Expense', id: 'LIST' }],
+          : [{ type: "Expense", id: "LIST" }],
     }),
     createExpense: builder.mutation<Expense, ExpensePayload>({
       query: (body) => ({
-        url: '/expenses',
-        method: 'POST',
+        url: "/expenses",
+        method: "POST",
         body,
       }),
-      invalidatesTags: [{ type: 'Expense', id: 'LIST' }, { type: 'Dashboard', id: 'CURRENT' }],
+      invalidatesTags: [
+        { type: "Expense", id: "LIST" },
+        { type: "Dashboard", id: "CURRENT" },
+      ],
     }),
-    updateExpense: builder.mutation<Expense, { id: string; body: ExpensePayload }>({
+    updateExpense: builder.mutation<
+      Expense,
+      { id: string; body: ExpensePayload }
+    >({
       query: ({ id, body }) => ({
         url: `/expenses/${id}`,
-        method: 'PUT',
+        method: "PUT",
         body,
       }),
       invalidatesTags: (_result, _error, arg) => [
-        { type: 'Expense', id: arg.id },
-        { type: 'Expense', id: 'LIST' },
-        { type: 'Dashboard', id: 'CURRENT' },
+        { type: "Expense", id: arg.id },
+        { type: "Expense", id: "LIST" },
+        { type: "Dashboard", id: "CURRENT" },
       ],
     }),
     deleteExpense: builder.mutation<{ message: string; id: string }, string>({
       query: (id) => ({
         url: `/expenses/${id}`,
-        method: 'DELETE',
+        method: "DELETE",
       }),
-      invalidatesTags: [{ type: 'Expense', id: 'LIST' }, { type: 'Dashboard', id: 'CURRENT' }],
+      invalidatesTags: [
+        { type: "Expense", id: "LIST" },
+        { type: "Dashboard", id: "CURRENT" },
+      ],
     }),
-    getEmployees: builder.query<PaginatedResponse<Employee>, EmployeeFilters | void>({
+    getEmployees: builder.query<
+      PaginatedResponse<Employee>,
+      EmployeeFilters | void
+    >({
       query: (filters) => ({
-        url: '/users',
+        url: "/users",
         params: filters,
       }),
       providesTags: (result) =>
         result
-          ? [...result.data.map((employee) => ({ type: 'Employee' as const, id: employee.id })), { type: 'Employee', id: 'LIST' }]
-          : [{ type: 'Employee', id: 'LIST' }],
+          ? [
+              ...result.data.map((employee) => ({
+                type: "Employee" as const,
+                id: employee.id,
+              })),
+              { type: "Employee", id: "LIST" },
+            ]
+          : [{ type: "Employee", id: "LIST" }],
     }),
     createEmployee: builder.mutation<Employee, EmployeePayload>({
-      query: (body) => ({ url: '/users', method: 'POST', body }),
-      invalidatesTags: [{ type: 'Employee', id: 'LIST' }],
+      query: (body) => ({ url: "/users", method: "POST", body }),
+      invalidatesTags: [{ type: "Employee", id: "LIST" }],
     }),
-    updateEmployee: builder.mutation<Employee, { id: string; body: EmployeePayload }>({
-      query: ({ id, body }) => ({ url: `/users/${id}`, method: 'PUT', body }),
+    updateEmployee: builder.mutation<
+      Employee,
+      { id: string; body: EmployeePayload }
+    >({
+      query: ({ id, body }) => ({ url: `/users/${id}`, method: "PUT", body }),
       invalidatesTags: (_result, _error, arg) => [
-        { type: 'Employee', id: arg.id },
-        { type: 'Employee', id: 'LIST' },
+        { type: "Employee", id: arg.id },
+        { type: "Employee", id: "LIST" },
       ],
     }),
     deleteEmployee: builder.mutation<{ message: string; id: string }, string>({
-      query: (id) => ({ url: `/users/${id}`, method: 'DELETE' }),
-      invalidatesTags: [{ type: 'Employee', id: 'LIST' }],
+      query: (id) => ({ url: `/users/${id}`, method: "DELETE" }),
+      invalidatesTags: [{ type: "Employee", id: "LIST" }],
     }),
-    getEmployeeSalaries: builder.query<EmployeeSalariesResponse, { month?: string; search?: string } | void>({
+    getEmployeeSalaries: builder.query<
+      EmployeeSalariesResponse,
+      { month?: string; search?: string } | void
+    >({
       query: (filters) => ({
-        url: '/users/salaries',
+        url: "/users/salaries",
         params: filters,
       }),
-      providesTags: [{ type: 'EmployeeSalary', id: 'LIST' }],
+      providesTags: [{ type: "EmployeeSalary", id: "LIST" }],
     }),
-    createEmployeeSalaryTransaction: builder.mutation<EmployeeSalaryTransaction, EmployeeSalaryTransactionPayload>({
+    createEmployeeSalaryTransaction: builder.mutation<
+      EmployeeSalaryTransaction,
+      EmployeeSalaryTransactionPayload
+    >({
       query: (body) => ({
-        url: '/users/salaries/transactions',
-        method: 'POST',
+        url: "/users/salaries/transactions",
+        method: "POST",
         body,
       }),
-      invalidatesTags: [{ type: 'EmployeeSalary', id: 'LIST' }, { type: 'Dashboard', id: 'CURRENT' }],
+      invalidatesTags: [
+        { type: "EmployeeSalary", id: "LIST" },
+        { type: "Dashboard", id: "CURRENT" },
+      ],
     }),
   }),
 });

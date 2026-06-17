@@ -31,7 +31,7 @@ type AuthContextValue = {
 };
 
 const TOKEN_KEY = 'sab_auth_token';
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://blcxkb9j-4000.inc1.devtunnels.ms/api';
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 async function readResponse(response: Response) {

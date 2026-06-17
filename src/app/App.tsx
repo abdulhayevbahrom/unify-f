@@ -62,7 +62,7 @@ const navigationItems: {
 ];
 
 const pageTitles = Object.fromEntries(navigationItems.map((item) => [item.key, item.label]));
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://blcxkb9j-4000.inc1.devtunnels.ms/api';
 const socketUrl = apiBaseUrl.replace(/\/api\/?$/, '');
 
 function formatMoney(value?: number) {
