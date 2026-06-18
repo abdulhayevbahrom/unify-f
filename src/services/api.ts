@@ -1,5 +1,7 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import { Permission } from "../auth/permissions";
+import { API_BASE_URL } from "../config/env";
+import { BrandingSettings } from "../config/branding";
 
 export type Teacher = {
   id: string;
@@ -132,9 +134,24 @@ export type Student = {
   advanceBalance: number;
   leftAt: string | null;
   enrollmentHistory: StudentEnrollmentHistory[];
+  enrollments: StudentEnrollment[];
   note: string;
   createdAt: string;
   updatedAt: string;
+};
+
+export type StudentEnrollment = {
+  id: string;
+  groupId: string;
+  group: Group | null;
+  groupName?: string;
+  subject?: string;
+  startedAt: string;
+  endedAt: string | null;
+  status: "active" | "finished";
+  discountType: "none" | "percentage" | "fixed";
+  discountValue: number;
+  discountReason: string;
 };
 
 export type StudentEnrollmentHistory = {
@@ -167,6 +184,9 @@ export type StudentPayload = {
   status: Student["status"];
   paymentStatus: Student["paymentStatus"];
   note?: string;
+  discountType?: StudentEnrollment["discountType"];
+  discountValue?: number;
+  discountReason?: string;
 };
 
 export type PaymentMethod =
@@ -185,6 +205,7 @@ export type StudentMonthlyBalance = {
   monthlyPriceSnapshot: number;
   chargedAmount: number;
   pauseDiscountAmount: number;
+  courseDiscountAmount: number;
   paidAmount: number;
   debtAmount: number;
   advanceAppliedAmount: number;
@@ -209,6 +230,10 @@ export type Payment = {
   cashClosureId: string | null;
   cashStatus: "open" | "pending_owner" | "approved" | "rejected";
   note: string;
+  status: "active" | "cancelled" | "refunded";
+  reversalReason: string;
+  reversedAt: string | null;
+  reversedBy: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -257,6 +282,17 @@ export type PaymentsDashboard = {
   pendingClosures: CashClosure[];
 };
 
+export type FinancialReport = {
+  from: string;
+  to: string;
+  income: number;
+  expense: number;
+  net: number;
+  debt: number;
+  paymentsCount: number;
+  expensesCount: number;
+};
+
 export type Debtor = {
   studentId: string;
   fullName: string;
@@ -264,7 +300,7 @@ export type Debtor = {
   secondaryPhone: string;
   groupName: string;
   totalDebt: number;
-  months: { month: string; debtAmount: number }[];
+  months: { balanceId: string; groupId: string; groupName: string; month: string; debtAmount: number }[];
 };
 
 export type StudentPause = {
@@ -288,6 +324,7 @@ export type StudentFinance = {
   balances: StudentMonthlyBalance[];
   payments: Payment[];
   pauses: StudentPause[];
+  enrollments: (Omit<StudentEnrollment, "group"> & { groupName: string; subject: string })[];
   paymentMethods: PaymentMethod[];
 };
 
@@ -295,6 +332,7 @@ export type PaymentPayload = {
   amount: number;
   method: PaymentMethod;
   targetMonth?: string;
+  targetBalanceId?: string;
   note?: string;
 };
 
@@ -548,14 +586,10 @@ export type StudentPausePayload = {
   status?: StudentPause["status"];
 };
 
-const baseUrl =
-  import.meta.env.VITE_API_BASE_URL ||
-  "https://blcxkb9j-4000.inc1.devtunnels.ms/api";
-
 export const api = createApi({
   reducerPath: "api",
   baseQuery: fetchBaseQuery({
-    baseUrl,
+    baseUrl: API_BASE_URL,
     prepareHeaders: (headers) => {
       const token = localStorage.getItem("sab_auth_token");
 
@@ -577,8 +611,26 @@ export const api = createApi({
     "EmployeeSalary",
     "Dashboard",
     "Notification",
+    "Settings",
   ],
   endpoints: (builder) => ({
+    getBrandingSettings: builder.query<BrandingSettings, void>({
+      query: () => "/settings/branding",
+      providesTags: [{ type: "Settings", id: "BRANDING" }],
+    }),
+    updateBrandingSettings: builder.mutation<BrandingSettings, Omit<BrandingSettings, "updatedAt">>({
+      query: (body) => ({ url: "/settings/branding", method: "PUT", body }),
+      invalidatesTags: [{ type: "Settings", id: "BRANDING" }],
+    }),
+    uploadBrandLogo: builder.mutation<BrandingSettings, { brand: "unify" | "accounting"; file: File }>({
+      query: ({ brand, file }) => ({
+        url: `/settings/branding/${brand}/logo`,
+        method: "PUT",
+        headers: { "Content-Type": file.type },
+        body: file,
+      }),
+      invalidatesTags: [{ type: "Settings", id: "BRANDING" }],
+    }),
     getDashboard: builder.query<DashboardResponse, { month?: string } | void>({
       query: (filters) => ({
         url: "/dashboard",
@@ -762,6 +814,21 @@ export const api = createApi({
         { type: "Student", id: "LIST" },
       ],
     }),
+    reversePayment: builder.mutation<Payment, { paymentId: string; studentId: string; reason: string }>({
+      query: ({ paymentId, reason }) => ({ url: `/finance/payments/${paymentId}/reverse`, method: "PUT", body: { reason } }),
+      invalidatesTags: (_result, _error, arg) => [
+        { type: "Finance", id: arg.studentId }, { type: "Finance", id: "DEBTORS" },
+        { type: "PaymentsDashboard", id: "CURRENT" }, { type: "Dashboard", id: "CURRENT" },
+      ],
+    }),
+    addStudentEnrollment: builder.mutation<Student, { studentId: string; body: { groupId: string; discountType: StudentEnrollment["discountType"]; discountValue: number; discountReason?: string } }>({
+      query: ({ studentId, body }) => ({ url: `/students/${studentId}/enrollments`, method: "POST", body }),
+      invalidatesTags: (_result, _error, arg) => [{ type: "Student", id: arg.studentId }, { type: "Student", id: "LIST" }, { type: "Finance", id: arg.studentId }],
+    }),
+    updateStudentEnrollment: builder.mutation<{ message: string }, { studentId: string; enrollmentId: string; body: Partial<StudentEnrollment> }>({
+      query: ({ studentId, enrollmentId, body }) => ({ url: `/students/${studentId}/enrollments/${enrollmentId}`, method: "PUT", body }),
+      invalidatesTags: (_result, _error, arg) => [{ type: "Student", id: arg.studentId }, { type: "Student", id: "LIST" }, { type: "Finance", id: arg.studentId }],
+    }),
     createStudentPause: builder.mutation<
       StudentPause,
       { studentId: string; body: StudentPausePayload }
@@ -795,6 +862,10 @@ export const api = createApi({
     getPaymentsDashboard: builder.query<PaymentsDashboard, void>({
       query: () => "/finance/payments-dashboard",
       providesTags: [{ type: "PaymentsDashboard", id: "CURRENT" }],
+    }),
+    getFinancialReport: builder.query<FinancialReport, { dateFrom: string; dateTo: string }>({
+      query: (params) => ({ url: "/reports/finance", params }),
+      providesTags: [{ type: "Dashboard", id: "REPORT" }],
     }),
     getNotifications: builder.query<{ data: AppNotification[] }, void>({
       query: () => "/notifications",
@@ -953,12 +1024,18 @@ export const api = createApi({
 });
 
 export const {
+  useGetBrandingSettingsQuery,
+  useUpdateBrandingSettingsMutation,
+  useUploadBrandLogoMutation,
   useCreateEmployeeMutation,
   useCreateEmployeeSalaryTransactionMutation,
   useCreateExpenseMutation,
   useCreateGroupMutation,
   useCreateStudentMutation,
   useCreatePaymentMutation,
+  useReversePaymentMutation,
+  useAddStudentEnrollmentMutation,
+  useUpdateStudentEnrollmentMutation,
   useCreateStudentPauseMutation,
   useCreateTeacherMutation,
   useDeleteEmployeeMutation,
@@ -976,6 +1053,7 @@ export const {
   useGetNotificationsQuery,
   useGetDebtorsQuery,
   useGetPaymentsDashboardQuery,
+  useGetFinancialReportQuery,
   useGetStudentFinanceQuery,
   useGetStudentsQuery,
   useGetTeachersQuery,

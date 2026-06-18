@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Alert, Button, Form, Input, InputNumber, Modal, Space, Table, Tabs, Tag, message } from 'antd';
+import { Alert, Button, DatePicker, Form, Input, InputNumber, Modal, Space, Table, Tabs, Tag, message } from 'antd';
 import dayjs from 'dayjs';
-import { Check, CircleDollarSign, LockKeyhole, X } from 'lucide-react';
+import { Check, CircleDollarSign, Download, LockKeyhole, X } from 'lucide-react';
 import {
   CashClosure,
   Debtor,
@@ -11,8 +11,10 @@ import {
   useGetDebtorsQuery,
   useGetPaymentsDashboardQuery,
   useReviewCashClosureMutation,
+  useGetFinancialReportQuery,
 } from '../../services/api';
 import PaymentMethodSelector from '../../components/PaymentMethodSelector';
+import { API_BASE_URL } from '../../config/env';
 
 type MultiMonthPaymentFormValues = {
   amount: number;
@@ -131,12 +133,32 @@ export default function PaymentsPage() {
   const [multiMonthPaymentForm] = Form.useForm<MultiMonthPaymentFormValues>();
   const [selectedDebtor, setSelectedDebtor] = useState<Debtor | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('cash');
+  const [reportRange, setReportRange] = useState<[dayjs.Dayjs, dayjs.Dayjs]>([dayjs().startOf('month'), dayjs()]);
   const enteredPaymentAmount = Form.useWatch('amount', multiMonthPaymentForm) || 0;
   const { data, isError, isFetching } = useGetPaymentsDashboardQuery();
   const { data: debtorsResponse, isFetching: isDebtorsFetching } = useGetDebtorsQuery();
   const [closeCashRegister, { isLoading: isClosing }] = useCloseCashRegisterMutation();
   const [createPayment, { isLoading: isPaymentSaving }] = useCreatePaymentMutation();
   const [reviewCashClosure, { isLoading: isReviewing }] = useReviewCashClosureMutation();
+  const reportParams = { dateFrom: reportRange[0].format('YYYY-MM-DD'), dateTo: reportRange[1].format('YYYY-MM-DD') };
+  const { data: report, isFetching: isReportFetching } = useGetFinancialReportQuery(reportParams);
+
+  async function exportReport() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/reports/finance/export?dateFrom=${reportParams.dateFrom}&dateTo=${reportParams.dateTo}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('sab_auth_token') || ''}` },
+      });
+      if (!response.ok) throw new Error('Eksportni yuklab bo‘lmadi');
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `moliyaviy-hisobot-${reportParams.dateFrom}-${reportParams.dateTo}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : 'Eksportda xatolik');
+    }
+  }
 
   function handleCloseCashRegister() {
     Modal.confirm({
@@ -208,6 +230,7 @@ export default function PaymentsPage() {
           amount: month.debtAmount,
           method: selectedPaymentMethod,
           targetMonth: month.month,
+          targetBalanceId: month.balanceId,
           note: `${month.month} oyi uchun to'lov`,
         },
       }).unwrap();
@@ -336,8 +359,8 @@ export default function PaymentsPage() {
                     render: (months: Debtor['months']) => (
                       <Space wrap>
                         {months.map((item) => (
-                          <Tag key={item.month} color="red">
-                            {item.month}: {formatMoney(item.debtAmount)}
+                          <Tag key={item.balanceId} color="red">
+                            {item.groupName} / {item.month}: {formatMoney(item.debtAmount)}
                           </Tag>
                         ))}
                       </Space>
@@ -354,6 +377,25 @@ export default function PaymentsPage() {
                   },
                 ]}
               />
+            ),
+          },
+          {
+            key: 'report',
+            label: 'Hisobot',
+            children: (
+              <div className="dashboard-panel">
+                <Space wrap className="page-actions">
+                  <DatePicker.RangePicker value={reportRange} format="DD.MM.YYYY" allowClear={false} onChange={(values) => { if (values?.[0] && values[1]) setReportRange([values[0], values[1]]); }} />
+                  <Button icon={<Download size={16} />} onClick={exportReport}>CSV yuklash</Button>
+                </Space>
+                <div className="dashboard-kpi-grid">
+                  <div className="payments-stat"><span>Kirim</span><strong>{formatMoney(report?.income)}</strong><small>{report?.paymentsCount || 0} ta to‘lov</small></div>
+                  <div className="payments-stat"><span>Xarajat</span><strong>{formatMoney(report?.expense)}</strong><small>{report?.expensesCount || 0} ta xarajat</small></div>
+                  <div className="payments-stat"><span>Sof natija</span><strong>{formatMoney(report?.net)}</strong></div>
+                  <div className="payments-stat"><span>Jami qarz</span><strong>{formatMoney(report?.debt)}</strong></div>
+                </div>
+                {isReportFetching ? <p>Hisobot yangilanmoqda...</p> : null}
+              </div>
             ),
           },
         ]}
@@ -438,8 +480,8 @@ export default function PaymentsPage() {
                     remainder = Math.max(remainder - allocatedAmount, 0);
 
                     return (
-                      <div key={month.month} className={allocatedAmount > 0 ? 'is-allocated' : ''}>
-                        <span>{month.month}</span>
+                      <div key={month.balanceId} className={allocatedAmount > 0 ? 'is-allocated' : ''}>
+                        <span>{month.groupName} / {month.month}</span>
                         <strong>{formatMoney(allocatedAmount)}</strong>
                         <small>{formatMoney(month.debtAmount)} qarz</small>
                       </div>
@@ -457,12 +499,13 @@ export default function PaymentsPage() {
             </div>
 
             <Table
-              rowKey="month"
+              rowKey="balanceId"
               size="small"
               dataSource={selectedDebtor.months}
               pagination={false}
               columns={[
                 { title: 'Oy', dataIndex: 'month' },
+                { title: 'Guruh', dataIndex: 'groupName' },
                 { title: 'Qarz', dataIndex: 'debtAmount', render: (value) => <span className="danger-text">{formatMoney(value)}</span> },
                 {
                   title: "To'lash",

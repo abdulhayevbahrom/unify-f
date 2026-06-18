@@ -36,8 +36,15 @@ import {
   useGetStudentsQuery,
   useUpdateStudentMutation,
   Group,
+  useGetBrandingSettingsQuery,
+  useAddStudentEnrollmentMutation,
+  useUpdateStudentEnrollmentMutation,
+  useReversePaymentMutation,
 } from '../../services/api';
 import PaymentMethodSelector from '../../components/PaymentMethodSelector';
+import BrandIdentity from '../../components/BrandIdentity';
+import { getCourseBrand } from '../../config/branding';
+import { useAuth } from '../../auth/AuthContext';
 
 const { TextArea } = Input;
 
@@ -84,6 +91,13 @@ type PaymentFormValues = {
 type PauseFormValues = {
   startDate: dayjs.Dayjs;
   reason?: string;
+};
+
+type EnrollmentFormValues = {
+  groupId: string;
+  discountType: 'none' | 'percentage' | 'fixed';
+  discountValue: number;
+  discountReason?: string;
 };
 
 const subjectOptions = [
@@ -182,10 +196,12 @@ function renderGroupOption(group: Group) {
 }
 
 export default function StudentsPage() {
+  const { user } = useAuth();
   const [form] = Form.useForm<StudentFormValues>();
   const [moveGroupForm] = Form.useForm<MoveGroupFormValues>();
   const [paymentForm] = Form.useForm<PaymentFormValues>();
   const [pauseForm] = Form.useForm<PauseFormValues>();
+  const [enrollmentForm] = Form.useForm<EnrollmentFormValues>();
   const [filters, setFilters] = useState<StudentFilters>({});
   const [studentView, setStudentView] = useState<'current' | 'history'>('current');
   const [page, setPage] = useState(1);
@@ -201,6 +217,10 @@ export default function StudentsPage() {
   const [showSecondaryPhone, setShowSecondaryPhone] = useState(false);
   const [showClosedGroups, setShowClosedGroups] = useState(false);
   const [showClosedMoveGroups, setShowClosedMoveGroups] = useState(false);
+  const { data: branding } = useGetBrandingSettingsQuery();
+  const [addEnrollment, { isLoading: isEnrollmentSaving }] = useAddStudentEnrollmentMutation();
+  const [updateEnrollment] = useUpdateStudentEnrollmentMutation();
+  const [reversePayment] = useReversePaymentMutation();
   const selectedSubject = Form.useWatch('subject', form);
   const selectedGroupId = Form.useWatch('groupId', form);
   const selectedMoveSubject = Form.useWatch('subject', moveGroupForm);
@@ -423,6 +443,7 @@ export default function StudentsPage() {
           amount: selectedPaymentBalance.debtAmount,
           method: selectedPaymentMethod,
           targetMonth: selectedPaymentBalance.month,
+          targetBalanceId: selectedPaymentBalance.id,
           note: `${selectedPaymentBalance.month} oyi uchun to'lov`,
         },
       }).unwrap();
@@ -437,6 +458,65 @@ export default function StudentsPage() {
 
   function printReceipt() {
     window.print();
+  }
+
+  async function handleEnrollmentSubmit(values: EnrollmentFormValues) {
+    if (!financeStudent) return;
+    try {
+      await addEnrollment({ studentId: financeStudent.id, body: { ...values, discountValue: values.discountValue || 0 } }).unwrap();
+      enrollmentForm.resetFields();
+      enrollmentForm.setFieldValue('discountType', 'none');
+      message.success('Yangi kursga yozildi');
+    } catch (error) {
+      message.error(getErrorMessage(error, 'Kursga yozib bo‘lmadi'));
+    }
+  }
+
+  function finishEnrollment(enrollmentId: string) {
+    if (!financeStudent) return;
+    Modal.confirm({
+      title: 'Kursni yakunlash',
+      content: 'O‘quvchining ushbu kurs bo‘yicha keyingi hisoblari to‘xtatiladi.',
+      okText: 'Yakunlash',
+      cancelText: 'Bekor qilish',
+      onOk: () => updateEnrollment({ studentId: financeStudent.id, enrollmentId, body: { status: 'finished' } }).unwrap(),
+    });
+  }
+
+  function editEnrollmentDiscount(record: { id: string; discountType: 'none' | 'percentage' | 'fixed'; discountValue: number; discountReason: string }) {
+    if (!financeStudent) return;
+    let discountType = record.discountType;
+    let discountValue = record.discountValue;
+    let discountReason = record.discountReason;
+    Modal.confirm({
+      title: 'Chegirmani o‘zgartirish',
+      content: (
+        <Space direction="vertical" className="full-width">
+          <Select className="full-width" defaultValue={discountType} onChange={(value) => { discountType = value; }} options={[{ label: 'Chegirmasiz', value: 'none' }, { label: 'Foiz', value: 'percentage' }, { label: 'Belgilangan summa', value: 'fixed' }]} />
+          <InputNumber className="full-width" min={0} defaultValue={discountValue} onChange={(value) => { discountValue = Number(value) || 0; }} />
+          <Input defaultValue={discountReason} placeholder="Chegirma sababi" onChange={(event) => { discountReason = event.target.value; }} />
+        </Space>
+      ),
+      okText: 'Saqlash',
+      cancelText: 'Yopish',
+      onOk: () => updateEnrollment({ studentId: financeStudent.id, enrollmentId: record.id, body: { discountType, discountValue, discountReason } }).unwrap(),
+    });
+  }
+
+  function confirmReversePayment(paymentId: string) {
+    if (!financeStudent) return;
+    let reason = '';
+    Modal.confirm({
+      title: 'To‘lovni bekor qilish / qaytarish',
+      content: <Input placeholder="Sababni kiriting" onChange={(event) => { reason = event.target.value; }} />,
+      okText: 'Tasdiqlash',
+      cancelText: 'Yopish',
+      onOk: async () => {
+        if (!reason.trim()) throw new Error('Sabab kiritilishi kerak');
+        await reversePayment({ paymentId, studentId: financeStudent.id, reason }).unwrap();
+        message.success('To‘lov bekor qilindi va balans yangilandi');
+      },
+    });
   }
 
   async function handlePauseSubmit(values: PauseFormValues) {
@@ -986,6 +1066,7 @@ export default function StudentsPage() {
                   scroll={{ x: 900 }}
                   columns={[
                     { title: 'Oy', dataIndex: 'month', width: 100 },
+                    { title: 'Guruh', dataIndex: 'groupId', render: (groupId) => financeData?.enrollments.find((item) => item.groupId === groupId)?.groupName || '-' },
                     {
                       title: 'Oylik narx',
                       dataIndex: 'monthlyPriceSnapshot',
@@ -996,6 +1077,7 @@ export default function StudentsPage() {
                       dataIndex: 'pauseDiscountAmount',
                       render: (value) => formatMoney(value),
                     },
+                    { title: 'Kurs chegirmasi', dataIndex: 'courseDiscountAmount', render: (value) => formatMoney(value) },
                     {
                       title: 'Hisoblangan',
                       dataIndex: 'chargedAmount',
@@ -1092,8 +1174,42 @@ export default function StudentsPage() {
                           allocations.length ? allocations.map((item) => `${item.month}: ${formatMoney(item.amount)}`).join(', ') : '-',
                       },
                       { title: 'Izoh', dataIndex: 'note', render: (value) => value || '-' },
+                      { title: 'Holat', dataIndex: 'status', render: (value) => <Tag color={value === 'active' ? 'green' : 'red'}>{value === 'active' ? 'Faol' : value === 'refunded' ? 'Qaytarilgan' : 'Bekor qilingan'}</Tag> },
+                      {
+                        title: 'Amal',
+                        render: (_value, record) => user?.role === 'owner' && record.status === 'active' ? (
+                          <Button size="small" danger onClick={() => confirmReversePayment(record.id)}>Bekor qilish</Button>
+                        ) : null,
+                      },
                     ]}
                   />
+                </>
+              ),
+            },
+            {
+              key: 'courses',
+              label: 'Kurslar va chegirmalar',
+              children: (
+                <>
+                  <Form form={enrollmentForm} layout="vertical" onFinish={handleEnrollmentSubmit} initialValues={{ discountType: 'none', discountValue: 0 }} className="finance-inline-form">
+                    <Form.Item name="groupId" label="Yangi guruh" rules={[{ required: true, message: 'Guruhni tanlang' }]}>
+                      <Select options={activeGroups.filter((group) => !financeData?.enrollments.some((item) => item.groupId === group.id && item.status === 'active')).map((group) => ({ label: `${group.name} — ${group.subject}`, value: group.id }))} />
+                    </Form.Item>
+                    <Form.Item name="discountType" label="Chegirma turi">
+                      <Select options={[{ label: 'Chegirmasiz', value: 'none' }, { label: 'Foiz', value: 'percentage' }, { label: 'Belgilangan summa', value: 'fixed' }]} />
+                    </Form.Item>
+                    <Form.Item name="discountValue" label="Chegirma qiymati"><InputNumber min={0} className="full-width" /></Form.Item>
+                    <Form.Item name="discountReason" label="Chegirma sababi"><Input /></Form.Item>
+                    <Form.Item className="finance-submit-item"><Button type="primary" htmlType="submit" loading={isEnrollmentSaving}>Kursga yozish</Button></Form.Item>
+                  </Form>
+                  <Table rowKey="id" size="small" dataSource={financeData?.enrollments || []} pagination={false} columns={[
+                    { title: 'Guruh', dataIndex: 'groupName' }, { title: 'Yo‘nalish', dataIndex: 'subject' },
+                    { title: 'Boshlangan', dataIndex: 'startedAt', render: (value) => dayjs(value).format('DD.MM.YYYY') },
+                    { title: 'Chegirma', render: (_value, record) => record.discountType === 'none' ? '-' : `${record.discountValue}${record.discountType === 'percentage' ? '%' : " so'm"}` },
+                    { title: 'Sabab', dataIndex: 'discountReason', render: (value) => value || '-' },
+                    { title: 'Holat', dataIndex: 'status', render: (value) => <Tag color={value === 'active' ? 'green' : 'default'}>{value === 'active' ? 'Faol' : 'Yakunlangan'}</Tag> },
+                    { title: 'Amal', render: (_value, record) => record.status === 'active' ? <Space><Button size="small" onClick={() => editEnrollmentDiscount(record)}>Chegirma</Button><Button size="small" danger onClick={() => finishEnrollment(record.id)}>Yakunlash</Button></Space> : null },
+                  ]} />
                 </>
               ),
             },
@@ -1192,8 +1308,7 @@ export default function StudentsPage() {
         {receipt ? (
           <div className="receipt-print-area">
             <div className="receipt-paper">
-              <h3>SAB Center</h3>
-              <p>Boshqaruv tizimi</p>
+              <BrandIdentity brand={getCourseBrand(receipt.student.group?.subject, branding)} variant="receipt" />
               <div className="receipt-divider" />
               <div className="receipt-row">
                 <span>Chek</span>

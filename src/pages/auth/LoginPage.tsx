@@ -1,6 +1,9 @@
 import { Button, Form, Input, Typography, message } from 'antd';
 import { LockKeyhole, LogIn, UserRound } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
+import BrandIdentity from '../../components/BrandIdentity';
+import { UNIFY_BRAND } from '../../config/branding';
+import { useGetBrandingSettingsQuery } from '../../services/api';
 
 type LoginValues = {
   fullName?: string;
@@ -11,6 +14,7 @@ type LoginValues = {
 export default function LoginPage() {
   const { login, setup, setupRequired } = useAuth();
   const [form] = Form.useForm<LoginValues>();
+  const { data: branding } = useGetBrandingSettingsQuery();
 
   async function handleSubmit(values: LoginValues) {
     try {
@@ -33,8 +37,7 @@ export default function LoginPage() {
   return (
     <main className="auth-page">
       <section className="auth-card">
-        <div className="auth-brand-mark">S</div>
-        <Typography.Title level={2}>SAB Center</Typography.Title>
+        <BrandIdentity brand={branding?.unify || UNIFY_BRAND} variant="login" />
         <Typography.Text type="secondary">
           {setupRequired ? 'Birinchi owner hisobini yarating' : 'Boshqaruv tizimiga kiring'}
         </Typography.Text>

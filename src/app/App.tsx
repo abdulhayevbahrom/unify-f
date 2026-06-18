@@ -13,6 +13,7 @@ import {
   UsersRound,
   Wallet,
   X,
+  Settings as SettingsIcon,
 } from 'lucide-react';
 import { Badge, Button, Dropdown, Layout, Menu, Modal, Spin, Tooltip, Typography, message } from 'antd';
 import dayjs from 'dayjs';
@@ -22,6 +23,9 @@ import { io } from 'socket.io-client';
 import { useDispatch } from 'react-redux';
 import { useAuth } from '../auth/AuthContext';
 import { Permission } from '../auth/permissions';
+import { SOCKET_URL } from '../config/env';
+import { UNIFY_BRAND } from '../config/branding';
+import BrandIdentity from '../components/BrandIdentity';
 import LoginPage from '../pages/auth/LoginPage';
 import DashboardPage from '../pages/dashboard/DashboardPage';
 import EmployeesPage from '../pages/employees/EmployeesPage';
@@ -32,6 +36,7 @@ import ReceptionPage from '../pages/reception/ReceptionPage';
 import SalariesPage from '../pages/salaries/SalariesPage';
 import StudentsPage from '../pages/students/StudentsPage';
 import TeachersPage from '../pages/teachers/TeachersPage';
+import SettingsPage from '../pages/settings/SettingsPage';
 import {
   AppNotification,
   CashClosure,
@@ -39,6 +44,7 @@ import {
   useGetNotificationsQuery,
   useMarkNotificationReadMutation,
   useReviewCashClosureMutation,
+  useGetBrandingSettingsQuery,
 } from '../services/api';
 
 const { Header, Sider, Content } = Layout;
@@ -46,7 +52,8 @@ const { Header, Sider, Content } = Layout;
 const navigationItems: {
   key: string;
   label: string;
-  permission: Permission;
+  permission?: Permission;
+  ownerOnly?: boolean;
   icon: ReactNode;
 }[] = [
   { key: '/dashboard', icon: <LayoutDashboard size={18} />, label: 'Dashboard', permission: 'dashboard' },
@@ -59,11 +66,10 @@ const navigationItems: {
   { key: '/expenses', icon: <ReceiptText size={18} />, label: 'Xarajatlar', permission: 'expenses' },
   { key: '/salaries', icon: <CircleDollarSign size={18} />, label: 'Oyliklar', permission: 'employees' },
   { key: '/employees', icon: <UserCog size={18} />, label: 'Hodimlar', permission: 'employees' },
+  { key: '/settings', icon: <SettingsIcon size={18} />, label: 'Sozlamalar', ownerOnly: true },
 ];
 
 const pageTitles = Object.fromEntries(navigationItems.map((item) => [item.key, item.label]));
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://blcxkb9j-4000.inc1.devtunnels.ms/api';
-const socketUrl = apiBaseUrl.replace(/\/api\/?$/, '');
 
 function formatMoney(value?: number) {
   return `${Number(value || 0).toLocaleString('uz-UZ')} so'm`;
@@ -89,7 +95,7 @@ function NotificationBell() {
 
     if (!token || !user) return undefined;
 
-    const socket = io(socketUrl, {
+    const socket = io(SOCKET_URL, {
       auth: { token },
       transports: ['websocket'],
     });
@@ -230,7 +236,10 @@ function Shell() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout, hasPermission } = useAuth();
-  const allowedItems = navigationItems.filter((item) => hasPermission(item.permission));
+  const { data: branding } = useGetBrandingSettingsQuery();
+  const allowedItems = navigationItems.filter((item) => (
+    item.ownerOnly ? user?.role === 'owner' : Boolean(item.permission && hasPermission(item.permission))
+  ));
   const defaultPath = allowedItems[0]?.key || '/login';
   const pageTitle = pageTitles[location.pathname] || "O'quv markaz boshqaruvi";
 
@@ -241,13 +250,9 @@ function Shell() {
 
   return (
     <Layout className="app-shell">
-      <Sider breakpoint="lg" collapsedWidth={0} width={272} className="app-sidebar">
+      <Sider breakpoint="lg" collapsedWidth={0} width={232} className="app-sidebar">
         <div className="brand">
-          <div className="brand-mark">U</div>
-          <div>
-            <Typography.Text className="brand-title">UNIFY academy</Typography.Text>
-            <Typography.Text className="brand-subtitle">Boshqaruv tizimi</Typography.Text>
-          </div>
+          <BrandIdentity brand={branding?.unify || UNIFY_BRAND} />
         </div>
         <Menu
           mode="inline"
@@ -282,6 +287,7 @@ function Shell() {
             <Route path="/expenses" element={<PermissionRoute permission="expenses"><ExpensesPage /></PermissionRoute>} />
             <Route path="/salaries" element={<PermissionRoute permission="employees"><SalariesPage /></PermissionRoute>} />
             <Route path="/employees" element={<PermissionRoute permission="employees"><EmployeesPage /></PermissionRoute>} />
+            <Route path="/settings" element={user?.role === 'owner' ? <SettingsPage /> : <Navigate to={defaultPath} replace />} />
             <Route path="*" element={<Navigate to={defaultPath} replace />} />
           </Routes>
         </Content>
