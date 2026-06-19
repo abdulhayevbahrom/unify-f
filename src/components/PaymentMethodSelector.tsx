@@ -5,9 +5,6 @@ const paymentMethodOptions: { label: string; value: PaymentMethod }[] = [
   { label: 'Naqd', value: 'cash' },
   { label: 'Click', value: 'click' },
   { label: 'Bank', value: 'bank_transfer' },
-  { label: 'Karta', value: 'card' },
-  { label: 'Payme', value: 'payme' },
-  { label: 'Boshqa', value: 'other' },
 ];
 
 type PaymentMethodSelectorProps = {

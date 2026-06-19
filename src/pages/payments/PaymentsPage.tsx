@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Alert, Button, DatePicker, Form, Input, InputNumber, Modal, Space, Table, Tabs, Tag, message } from 'antd';
+import { Alert, Button, DatePicker, Form, Input, InputNumber, Modal, Space, Switch, Table, Tabs, Tag, message } from 'antd';
 import dayjs from 'dayjs';
-import { Check, CircleDollarSign, Download, LockKeyhole, X } from 'lucide-react';
+import { Check, CircleDollarSign, Download, Edit3, LockKeyhole, Search, X } from 'lucide-react';
 import {
   CashClosure,
   Debtor,
@@ -12,31 +12,41 @@ import {
   useGetPaymentsDashboardQuery,
   useReviewCashClosureMutation,
   useGetFinancialReportQuery,
+  Payment,
+  PaymentHistoryItem,
+  Student,
+  useGetStudentsQuery,
+  useGetStudentFinanceQuery,
+  useGetPaymentsHistoryQuery,
+  useReversePaymentMutation,
+  useUpdatePaymentMutation,
 } from '../../services/api';
 import PaymentMethodSelector from '../../components/PaymentMethodSelector';
 import { API_BASE_URL } from '../../config/env';
+import { useAuth } from '../../auth/AuthContext';
 
 type MultiMonthPaymentFormValues = {
   amount: number;
   note?: string;
 };
 
+type StudentPaymentFormValues = {
+  amount: number;
+  method: PaymentMethod;
+  isAdvance?: boolean;
+  note?: string;
+};
+
 const paymentMethodLabels: Record<PaymentMethod, string> = {
   cash: 'Naqd',
-  card: 'Karta',
   bank_transfer: "Bank o'tkazma",
   click: 'Click',
-  payme: 'Payme',
-  other: 'Boshqa',
 };
 
 const paymentMethodColors: Record<PaymentMethod, string> = {
   cash: '#e83f63',
-  card: '#3a86ff',
   bank_transfer: '#20c997',
   click: '#f59e0b',
-  payme: '#8b5cf6',
-  other: '#aeb4c0',
 };
 
 function formatMoney(value?: number) {
@@ -130,10 +140,14 @@ function PhoneCell({ debtor }: { debtor: Debtor }) {
 }
 
 export default function PaymentsPage() {
+  const { user } = useAuth();
   const [multiMonthPaymentForm] = Form.useForm<MultiMonthPaymentFormValues>();
+  const [studentPaymentForm] = Form.useForm<StudentPaymentFormValues>();
   const [selectedDebtor, setSelectedDebtor] = useState<Debtor | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('cash');
   const [reportRange, setReportRange] = useState<[dayjs.Dayjs, dayjs.Dayjs]>([dayjs().startOf('month'), dayjs()]);
+  const [studentSearch, setStudentSearch] = useState('');
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const enteredPaymentAmount = Form.useWatch('amount', multiMonthPaymentForm) || 0;
   const { data, isError, isFetching } = useGetPaymentsDashboardQuery();
   const { data: debtorsResponse, isFetching: isDebtorsFetching } = useGetDebtorsQuery();
@@ -142,6 +156,11 @@ export default function PaymentsPage() {
   const [reviewCashClosure, { isLoading: isReviewing }] = useReviewCashClosureMutation();
   const reportParams = { dateFrom: reportRange[0].format('YYYY-MM-DD'), dateTo: reportRange[1].format('YYYY-MM-DD') };
   const { data: report, isFetching: isReportFetching } = useGetFinancialReportQuery(reportParams);
+  const { data: studentsResponse, isFetching: isStudentsFetching } = useGetStudentsQuery({ search: studentSearch.trim() || undefined, limit: 20, view: 'current' });
+  const { data: selectedFinance, isFetching: isSelectedFinanceFetching } = useGetStudentFinanceQuery(selectedStudent?.id || '', { skip: !selectedStudent });
+  const { data: paymentHistory, isFetching: isHistoryFetching } = useGetPaymentsHistoryQuery({ page: 1, limit: 100 });
+  const [reversePayment] = useReversePaymentMutation();
+  const [updatePayment] = useUpdatePaymentMutation();
 
   async function exportReport() {
     try {
@@ -158,6 +177,46 @@ export default function PaymentsPage() {
     } catch (error) {
       message.error(error instanceof Error ? error.message : 'Eksportda xatolik');
     }
+  }
+
+  async function submitStudentPayment(values: StudentPaymentFormValues) {
+    if (!selectedStudent) return;
+    try {
+      await createPayment({ studentId: selectedStudent.id, body: { ...values, note: values.note?.trim() || '' } }).unwrap();
+      studentPaymentForm.resetFields();
+      studentPaymentForm.setFieldsValue({ method: 'cash', isAdvance: false });
+      message.success(values.isAdvance ? 'Oldindan to‘lov saqlandi' : 'To‘lov saqlandi');
+    } catch (error) {
+      const apiError = error as { data?: { message?: string } };
+      message.error(apiError.data?.message || 'To‘lovni saqlab bo‘lmadi');
+    }
+  }
+
+  function editPayment(record: Payment) {
+    if (!selectedStudent) return;
+    let amount = record.amount;
+    let method = record.method;
+    let note = record.note;
+    Modal.confirm({
+      title: 'To‘lovni tahrirlash',
+      content: <Space direction="vertical" className="full-width"><InputNumber className="full-width" min={1} defaultValue={amount} onChange={(value) => { amount = Number(value) || 0; }} /><PaymentMethodSelector value={method} onChange={(value) => { method = value; }} /><Input defaultValue={note} placeholder="Izoh" onChange={(event) => { note = event.target.value; }} /></Space>,
+      okText: 'Saqlash', cancelText: 'Yopish',
+      onOk: () => updatePayment({ paymentId: record.id, studentId: selectedStudent.id, body: { amount, method, note } }).unwrap(),
+    });
+  }
+
+  function cancelPayment(record: Payment) {
+    if (!selectedStudent) return;
+    let reason = '';
+    Modal.confirm({
+      title: record.cashStatus === 'approved' ? 'To‘lovni qaytarish' : 'To‘lovni bekor qilish',
+      content: <Input placeholder="Sababni kiriting" onChange={(event) => { reason = event.target.value; }} />,
+      okText: 'Tasdiqlash', cancelText: 'Yopish',
+      onOk: async () => {
+        if (!reason.trim()) throw new Error('Sabab kiritilishi kerak');
+        await reversePayment({ paymentId: record.id, studentId: selectedStudent.id, reason }).unwrap();
+      },
+    });
   }
 
   function handleCloseCashRegister() {
@@ -249,6 +308,21 @@ export default function PaymentsPage() {
       <Tabs
         items={[
           {
+            key: 'student-payment',
+            label: "O'quvchi bo'yicha",
+            children: (
+              <>
+                <Input prefix={<Search size={17} />} allowClear value={studentSearch} onChange={(event) => setStudentSearch(event.target.value)} placeholder="Ism yoki telefon bo‘yicha qidiring" className="payments-student-search" />
+                <Table rowKey="id" size="small" loading={isStudentsFetching} dataSource={studentsResponse?.data || []} pagination={false} columns={[
+                  { title: "F.I.Sh", dataIndex: 'fullName' }, { title: 'Telefon', dataIndex: 'phone' },
+                  { title: 'Guruh', render: (_value, record: Student) => record.group?.name || '-' },
+                  { title: 'Holat', dataIndex: 'paymentStatus', render: (value) => <Tag color={value === 'paid' ? 'green' : 'red'}>{value === 'paid' ? 'Qarzsiz' : 'Qarzdor'}</Tag> },
+                  { title: 'Amal', width: 130, render: (_value, record: Student) => <Button type="primary" size="small" onClick={() => { setSelectedStudent(record); studentPaymentForm.setFieldsValue({ method: 'cash', isAdvance: false }); }}>To‘lovlar</Button> },
+                ]} />
+              </>
+            ),
+          },
+          {
             key: 'payments',
             label: "To'lovlar",
             children: (
@@ -338,6 +412,22 @@ export default function PaymentsPage() {
             ),
           },
           {
+            key: 'history',
+            label: 'To‘lovlar tarixi',
+            children: (
+              <Table rowKey="id" size="small" loading={isHistoryFetching} dataSource={paymentHistory?.data || []} pagination={false} scroll={{ x: 900 }} columns={[
+                { title: 'Sana', dataIndex: 'paidAt', render: (value) => dayjs(value).format('DD.MM.YYYY HH:mm') },
+                { title: "O‘quvchi", render: (_value, record: PaymentHistoryItem) => record.student?.fullName || '-' },
+                { title: 'Telefon', render: (_value, record: PaymentHistoryItem) => record.student?.phone || '-' },
+                { title: 'Summa', dataIndex: 'amount', render: formatMoney },
+                { title: 'Usul', dataIndex: 'method', render: (value: PaymentMethod) => paymentMethodLabels[value] || value },
+                { title: 'Kassa', dataIndex: 'cashStatus', render: (value) => <Tag color={value === 'approved' ? 'green' : value === 'pending_owner' ? 'blue' : 'orange'}>{value === 'approved' ? 'Tasdiqlangan' : value === 'pending_owner' ? 'Tasdiqda' : 'Ochiq'}</Tag> },
+                { title: 'Holat', dataIndex: 'status', render: (value) => <Tag color={value === 'active' ? 'green' : 'red'}>{value === 'active' ? 'Faol' : value === 'refunded' ? 'Qaytarilgan' : 'Bekor'}</Tag> },
+                { title: 'Izoh', dataIndex: 'note', render: (value) => value || '-' },
+              ]} />
+            ),
+          },
+          {
             key: 'debtors',
             label: 'Qarzdorlar',
             children: (
@@ -401,6 +491,41 @@ export default function PaymentsPage() {
         ]}
       />
 
+      <Modal title={selectedStudent ? `${selectedStudent.fullName} — to‘lovlar` : 'O‘quvchi to‘lovlari'} open={Boolean(selectedStudent)} onCancel={() => setSelectedStudent(null)} footer={null} width={1000}>
+        {selectedStudent ? (
+          <>
+            <div className="finance-summary">
+              <div><span>Umumiy qarz</span><strong className={selectedFinance?.summary.totalDebt ? 'danger-text' : 'success-text'}>{formatMoney(selectedFinance?.summary.totalDebt)}</strong></div>
+              <div><span>Oldindan to‘lov</span><strong>{formatMoney(selectedFinance?.summary.advanceBalance)}</strong></div>
+              <div><span>Telefon</span><strong>{selectedStudent.phone}</strong></div>
+            </div>
+            <Form form={studentPaymentForm} layout="vertical" onFinish={submitStudentPayment} className="finance-inline-form">
+              <Form.Item name="method" label="To‘lov usuli" rules={[{ required: true }]}><PaymentMethodSelector /></Form.Item>
+              <Form.Item name="amount" label="Summa" rules={[{ required: true, message: 'Summani kiriting' }]}><InputNumber<number> min={1} className="full-width" formatter={(value) => `${value || ''}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} parser={(value) => Number(value?.replace(/\s/g, '') || 0)} /></Form.Item>
+              <Form.Item name="isAdvance" label="Oldindan to‘lov" valuePropName="checked"><Switch /></Form.Item>
+              <Form.Item name="note" label="Izoh"><Input /></Form.Item>
+              <Form.Item className="finance-submit-item"><Button type="primary" htmlType="submit" loading={isPaymentSaving}>To‘lovni saqlash</Button></Form.Item>
+            </Form>
+            {selectedFinance?.summary.totalDebt ? <Alert type="info" showIcon message="Oldindan to‘lov qilishdan avval barcha eski qarzlar yopilishi kerak." className="page-alert" /> : null}
+            <Tabs items={[
+              { key: 'debts', label: 'Qarzlar', children: <Table rowKey="id" size="small" loading={isSelectedFinanceFetching} dataSource={selectedFinance?.balances || []} pagination={false} columns={[
+                { title: 'Oy', dataIndex: 'month' }, { title: 'Guruh', dataIndex: 'groupId', render: (groupId) => selectedFinance?.enrollments.find((item) => item.groupId === groupId)?.groupName || '-' },
+                { title: 'Hisoblangan', dataIndex: 'chargedAmount', render: formatMoney }, { title: 'To‘langan', dataIndex: 'paidAmount', render: formatMoney },
+                { title: 'Qarz', dataIndex: 'debtAmount', render: (value) => <span className={value ? 'danger-text' : 'success-text'}>{formatMoney(value)}</span> },
+              ]} /> },
+              { key: 'student-history', label: 'To‘lov tarixi', children: <Table rowKey="id" size="small" loading={isSelectedFinanceFetching} dataSource={selectedFinance?.payments || []} pagination={false} scroll={{ x: 900 }} columns={[
+                { title: 'Sana', dataIndex: 'paidAt', render: (value) => dayjs(value).format('DD.MM.YYYY HH:mm') }, { title: 'Summa', dataIndex: 'amount', render: formatMoney },
+                { title: 'Usul', dataIndex: 'method', render: (value: PaymentMethod) => paymentMethodLabels[value] || value }, { title: 'Avans', dataIndex: 'advanceAmount', render: formatMoney },
+                { title: 'Kassa', dataIndex: 'cashStatus', render: (value) => <Tag>{value === 'approved' ? 'Tasdiqlangan' : value === 'pending_owner' ? 'Tasdiqda' : 'Ochiq'}</Tag> },
+                { title: 'Holat', dataIndex: 'status', render: (value) => <Tag color={value === 'active' ? 'green' : 'red'}>{value === 'active' ? 'Faol' : value === 'refunded' ? 'Qaytarilgan' : 'Bekor'}</Tag> },
+                { title: 'Izoh', dataIndex: 'note', render: (value) => value || '-' },
+                { title: 'Amallar', render: (_value, record: Payment) => user?.role === 'owner' && record.status === 'active' ? <Space><Button size="small" icon={<Edit3 size={14} />} disabled={record.cashStatus !== 'open'} onClick={() => editPayment(record)} /><Button size="small" danger onClick={() => cancelPayment(record)}>{record.cashStatus === 'approved' ? 'Qaytarish' : 'Bekor'}</Button></Space> : null },
+              ]} /> },
+            ]} />
+          </>
+        ) : null}
+      </Modal>
+
       <Modal
         title={selectedDebtor ? `${selectedDebtor.fullName} - qarz oylari` : 'Qarz oylari'}
         open={Boolean(selectedDebtor)}
@@ -442,7 +567,7 @@ export default function PaymentsPage() {
                   { type: 'number', min: 1, message: "To'lov summasi 0 dan katta bo'lishi kerak" },
                 ]}
               >
-                <InputNumber
+                <InputNumber<number>
                   min={1}
                   className="full-width"
                   addonAfter="so'm"

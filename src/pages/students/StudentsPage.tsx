@@ -120,11 +120,8 @@ const dayLabels = new Map([
 
 const paymentMethodOptions: { label: string; value: PaymentMethod }[] = [
   { label: 'Naqd', value: 'cash' },
-  { label: 'Karta', value: 'card' },
   { label: "Bank o'tkazma", value: 'bank_transfer' },
   { label: 'Click', value: 'click' },
-  { label: 'Payme', value: 'payme' },
-  { label: 'Boshqa', value: 'other' },
 ];
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -707,16 +704,6 @@ export default function StudentsPage() {
             width: 110,
             render: (status) => <StudentStatusTag status={status} />,
           },
-          ...(studentView === 'current'
-            ? [
-                {
-                  title: "To'lov",
-                  dataIndex: 'paymentStatus',
-                  width: 120,
-                  render: (status: Student['paymentStatus']) => <PaymentStatusTag status={status} />,
-                },
-              ]
-            : []),
           {
             title: 'Amallar',
             width: studentView === 'history' ? 72 : 190,
@@ -741,11 +728,11 @@ export default function StudentsPage() {
                       onClick={() => openEditDrawer(record)}
                     />
                   </Tooltip>
-                  <Tooltip title="To'lovlar va qarzlar">
+                  <Tooltip title="Kurslar va pauzalar">
                     <Button
                       className="action-finance-button"
                       size="small"
-                      icon={<CircleDollarSign size={17} />}
+                      icon={<PauseCircle size={17} />}
                       onClick={() => openFinanceModal(record)}
                     />
                   </Tooltip>
@@ -1011,32 +998,12 @@ export default function StudentsPage() {
       </Modal>
 
       <Modal
-        title={financeStudent ? `${financeStudent.fullName} - to'lovlar va qarzlar` : "To'lovlar va qarzlar"}
+        title={financeStudent ? `${financeStudent.fullName} - kurslar va pauzalar` : "Kurslar va pauzalar"}
         open={Boolean(financeStudent)}
         onCancel={closeFinanceModal}
         footer={null}
         width={980}
       >
-        <div className="finance-summary">
-          <div>
-            <span>Umumiy qarz</span>
-            <strong className={financeData?.summary.totalDebt ? 'danger-text' : 'success-text'}>
-              {formatMoney(financeData?.summary.totalDebt)}
-            </strong>
-          </div>
-          <div>
-            <span>Oldindan to'lov</span>
-            <strong>{formatMoney(financeData?.summary.advanceBalance)}</strong>
-          </div>
-          <div>
-            <span>Holat</span>
-            <Space>
-              <PaymentStatusTag status={financeData?.summary.paymentStatus || 'debt'} />
-              {financeStudent?.status === 'paused' ? <Tag color="orange">Pauzada</Tag> : null}
-            </Space>
-          </div>
-        </div>
-
         {financeStudent?.status === 'paused' ? (
           <Alert
             className="page-alert"
@@ -1252,7 +1219,7 @@ export default function StudentsPage() {
                 </>
               ),
             },
-          ]}
+          ].filter((item) => item.key === 'courses' || item.key === 'pauses')}
         />
       </Modal>
 

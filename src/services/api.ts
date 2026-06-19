@@ -191,11 +191,8 @@ export type StudentPayload = {
 
 export type PaymentMethod =
   | "cash"
-  | "card"
   | "bank_transfer"
-  | "click"
-  | "payme"
-  | "other";
+  | "click";
 
 export type StudentMonthlyBalance = {
   id: string;
@@ -236,6 +233,10 @@ export type Payment = {
   reversedBy: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type PaymentHistoryItem = Payment & {
+  student: { id: string; fullName: string; phone: string } | null;
 };
 
 export type CashClosure = {
@@ -333,6 +334,8 @@ export type PaymentPayload = {
   method: PaymentMethod;
   targetMonth?: string;
   targetBalanceId?: string;
+  isAdvance?: boolean;
+  paidAt?: string;
   note?: string;
 };
 
@@ -430,6 +433,11 @@ export type DashboardResponse = {
     advanceBalanceAmount: number;
     salaryAccruedAmount: number;
     salaryPayableAmount: number;
+  };
+  today: {
+    incomeAmount: number;
+    expenseAmount: number;
+    netAmount: number;
   };
   counts: {
     students: {
@@ -812,14 +820,26 @@ export const api = createApi({
         { type: "Dashboard", id: "CURRENT" },
         { type: "Student", id: arg.studentId },
         { type: "Student", id: "LIST" },
+        { type: "Finance", id: "PAYMENT_HISTORY" },
       ],
     }),
     reversePayment: builder.mutation<Payment, { paymentId: string; studentId: string; reason: string }>({
       query: ({ paymentId, reason }) => ({ url: `/finance/payments/${paymentId}/reverse`, method: "PUT", body: { reason } }),
       invalidatesTags: (_result, _error, arg) => [
         { type: "Finance", id: arg.studentId }, { type: "Finance", id: "DEBTORS" },
-        { type: "PaymentsDashboard", id: "CURRENT" }, { type: "Dashboard", id: "CURRENT" },
+        { type: "PaymentsDashboard", id: "CURRENT" }, { type: "Dashboard", id: "CURRENT" }, { type: "Finance", id: "PAYMENT_HISTORY" },
       ],
+    }),
+    updatePayment: builder.mutation<Payment, { paymentId: string; studentId: string; body: PaymentPayload }>({
+      query: ({ paymentId, body }) => ({ url: `/finance/payments/${paymentId}`, method: "PUT", body }),
+      invalidatesTags: (_result, _error, arg) => [
+        { type: "Finance", id: arg.studentId }, { type: "Finance", id: "DEBTORS" },
+        { type: "PaymentsDashboard", id: "CURRENT" }, { type: "Dashboard", id: "CURRENT" }, { type: "Finance", id: "PAYMENT_HISTORY" },
+      ],
+    }),
+    getPaymentsHistory: builder.query<PaginatedResponse<PaymentHistoryItem>, { studentId?: string; page?: number; limit?: number }>({
+      query: (params) => ({ url: "/finance/payments", params }),
+      providesTags: [{ type: "Finance", id: "PAYMENT_HISTORY" }],
     }),
     addStudentEnrollment: builder.mutation<Student, { studentId: string; body: { groupId: string; discountType: StudentEnrollment["discountType"]; discountValue: number; discountReason?: string } }>({
       query: ({ studentId, body }) => ({ url: `/students/${studentId}/enrollments`, method: "POST", body }),
@@ -1034,6 +1054,8 @@ export const {
   useCreateStudentMutation,
   useCreatePaymentMutation,
   useReversePaymentMutation,
+  useUpdatePaymentMutation,
+  useGetPaymentsHistoryQuery,
   useAddStudentEnrollmentMutation,
   useUpdateStudentEnrollmentMutation,
   useCreateStudentPauseMutation,

@@ -33,11 +33,8 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, 
 
 const methodLabels: Record<PaymentMethod, string> = {
   cash: 'Naqd',
-  card: 'Karta',
   bank_transfer: "Bank o'tkazma",
   click: 'Click',
-  payme: 'Payme',
-  other: 'Boshqa',
 };
 
 const activityLabels: Record<DashboardActivity['type'], string> = {
@@ -204,6 +201,12 @@ export default function DashboardPage() {
             if (value) setSelectedMonth(value.format('YYYY-MM'));
           }}
         />
+      </div>
+
+      <div className="dashboard-kpi-grid">
+        <KpiCard title="Bugungi kirim" value={formatMoney(data?.today.incomeAmount)} detail="Faqat tasdiqlangan kassa" tone="income" icon={<ArrowUpRight size={20} />} />
+        <KpiCard title="Bugungi xarajat" value={formatMoney(data?.today.expenseAmount)} detail="Bugun kiritilgan xarajatlar" tone="expense" icon={<ReceiptText size={20} />} />
+        <KpiCard title="Bugungi natija" value={formatMoney(data?.today.netAmount)} detail="Kirim - xarajat" tone={Number(data?.today.netAmount || 0) >= 0 ? 'success' : 'expense'} icon={<Banknote size={20} />} />
       </div>
 
       <div className="dashboard-kpi-grid">
