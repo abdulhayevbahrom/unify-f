@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Alert, Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Switch, Table, Tabs, Tag, message } from 'antd';
 import dayjs from 'dayjs';
-import { Check, CircleDollarSign, Download, Edit3, LockKeyhole, Printer, Search, X } from 'lucide-react';
+import { Check, CircleDollarSign, Download, Edit3, LockKeyhole, Printer, Search, Trash2, X } from 'lucide-react';
 import {
   CashClosure,
   Debtor,
@@ -150,6 +150,7 @@ function PhoneCell({ debtor }: { debtor: Debtor }) {
 
 export default function PaymentsPage() {
   const { user } = useAuth();
+  const [modal, modalContextHolder] = Modal.useModal();
   const [multiMonthPaymentForm] = Form.useForm<MultiMonthPaymentFormValues>();
   const [studentPaymentForm] = Form.useForm<StudentPaymentFormValues>();
   const [selectedDebtor, setSelectedDebtor] = useState<Debtor | null>(null);
@@ -215,35 +216,76 @@ export default function PaymentsPage() {
     }
   }
 
-  function editPayment(record: Payment) {
-    if (!selectedStudent) return;
+  function editPayment(record: Payment, studentId = selectedStudent?.id) {
+    if (!studentId) return;
     let amount = record.amount;
     let method = record.method;
     let note = record.note;
-    Modal.confirm({
+    modal.confirm({
       title: 'To‘lovni tahrirlash',
-      content: <Space direction="vertical" className="full-width"><InputNumber className="full-width" min={1} defaultValue={amount} onChange={(value) => { amount = Number(value) || 0; }} /><PaymentMethodSelector value={method} onChange={(value) => { method = value; }} /><Input defaultValue={note} placeholder="Izoh" onChange={(event) => { note = event.target.value; }} /></Space>,
+      className: 'payment-edit-confirm',
+      content: (
+        <div className="payment-edit-form">
+          <label>
+            <span>Summa</span>
+            <InputNumber className="full-width" min={1} defaultValue={amount} onChange={(value) => { amount = Number(value) || 0; }} />
+          </label>
+          <label>
+            <span>To‘lov usuli</span>
+            <PaymentMethodSelector value={method} onChange={(value) => { method = value; }} />
+          </label>
+          <label>
+            <span>Izoh</span>
+            <Input defaultValue={note} placeholder="Izoh kiriting" onChange={(event) => { note = event.target.value; }} />
+          </label>
+        </div>
+      ),
       okText: 'Saqlash', cancelText: 'Yopish',
-      onOk: () => updatePayment({ paymentId: record.id, studentId: selectedStudent.id, body: { amount, method, note } }).unwrap(),
+      onOk: () => updatePayment({ paymentId: record.id, studentId, body: { amount, method, note } }).unwrap(),
     });
   }
 
-  function cancelPayment(record: Payment) {
-    if (!selectedStudent) return;
+  function cancelPayment(record: Payment, studentId = selectedStudent?.id) {
+    if (!studentId) return;
     let reason = '';
-    Modal.confirm({
+    modal.confirm({
       title: record.cashStatus === 'approved' ? 'To‘lovni qaytarish' : 'To‘lovni bekor qilish',
       content: <Input placeholder="Sababni kiriting" onChange={(event) => { reason = event.target.value; }} />,
       okText: 'Tasdiqlash', cancelText: 'Yopish',
       onOk: async () => {
         if (!reason.trim()) throw new Error('Sabab kiritilishi kerak');
-        await reversePayment({ paymentId: record.id, studentId: selectedStudent.id, reason }).unwrap();
+        await reversePayment({ paymentId: record.id, studentId, reason }).unwrap();
       },
     });
   }
 
+  function renderPaymentActions(record: Payment, studentId?: string) {
+    if (user?.role !== 'owner' || record.status !== 'active' || !studentId) return null;
+
+    return (
+      <Space>
+        <Button
+          size="small"
+          icon={<Edit3 size={14} />}
+          title="To'lovni tahrirlash"
+          onClick={() => editPayment(record, studentId)}
+        >
+          Tahrirlash
+        </Button>
+        <Button
+          size="small"
+          danger
+          icon={<Trash2 size={14} />}
+          onClick={() => cancelPayment(record, studentId)}
+        >
+          {record.cashStatus === 'approved' ? 'Qaytarish' : "O'chirish"}
+        </Button>
+      </Space>
+    );
+  }
+
   function handleCloseCashRegister() {
-    Modal.confirm({
+    modal.confirm({
       title: 'Kassani yopish',
       content: "Yopilmagan barcha to'lovlar bitta kassa yopilishiga biriktiriladi va owner tasdig'iga yuboriladi.",
       okText: 'Yopish',
@@ -328,6 +370,7 @@ export default function PaymentsPage() {
 
   return (
     <section className="page">
+      {modalContextHolder}
       {isError ? <Alert className="page-alert" type="error" message="To'lovlar ma'lumotini yuklab bo'lmadi." showIcon /> : null}
 
       <Tabs
@@ -449,6 +492,7 @@ export default function PaymentsPage() {
                 { title: 'Kassa', dataIndex: 'cashStatus', render: (value) => <Tag color={value === 'approved' ? 'green' : value === 'pending_owner' ? 'blue' : 'orange'}>{value === 'approved' ? 'Tasdiqlangan' : value === 'pending_owner' ? 'Tasdiqda' : 'Ochiq'}</Tag> },
                 { title: 'Holat', dataIndex: 'status', render: (value) => <Tag color={value === 'active' ? 'green' : 'red'}>{value === 'active' ? 'Faol' : value === 'refunded' ? 'Qaytarilgan' : 'Bekor'}</Tag> },
                 { title: 'Izoh', dataIndex: 'note', render: (value) => value || '-' },
+                { title: 'Amallar', width: 220, render: (_value, record: PaymentHistoryItem) => renderPaymentActions(record, record.student?.id) },
               ]} />
             ),
           },
@@ -551,6 +595,7 @@ export default function PaymentsPage() {
                     { title: 'Usul', dataIndex: 'method', render: (value: PaymentMethod) => paymentMethodLabels[value] || value },
                     { title: 'Kiritgan', dataIndex: 'createdBy', render: (value) => value?.fullName || '-' },
                     { title: 'Izoh', dataIndex: 'note', render: (value) => value || '-' },
+                    { title: 'Amallar', width: 220, render: (_value, record: PaymentHistoryItem) => renderPaymentActions(record, record.student?.id) },
                   ]}
                 />
               </div>
@@ -587,7 +632,7 @@ export default function PaymentsPage() {
                 { title: 'Kassa', dataIndex: 'cashStatus', render: (value) => <Tag>{value === 'approved' ? 'Tasdiqlangan' : value === 'pending_owner' ? 'Tasdiqda' : 'Ochiq'}</Tag> },
                 { title: 'Holat', dataIndex: 'status', render: (value) => <Tag color={value === 'active' ? 'green' : 'red'}>{value === 'active' ? 'Faol' : value === 'refunded' ? 'Qaytarilgan' : 'Bekor'}</Tag> },
                 { title: 'Izoh', dataIndex: 'note', render: (value) => value || '-' },
-                { title: 'Amallar', render: (_value, record: Payment) => user?.role === 'owner' && record.status === 'active' ? <Space><Button size="small" icon={<Edit3 size={14} />} disabled={record.cashStatus !== 'open'} onClick={() => editPayment(record)} /><Button size="small" danger onClick={() => cancelPayment(record)}>{record.cashStatus === 'approved' ? 'Qaytarish' : 'Bekor'}</Button></Space> : null },
+                { title: 'Amallar', width: 220, render: (_value, record: Payment) => renderPaymentActions(record, selectedStudent.id) },
               ]} /> },
             ]} />
           </>

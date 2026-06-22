@@ -1300,6 +1300,33 @@ body {
   grid-template-columns: minmax(240px, 1.3fr) minmax(140px, 0.7fr) 130px minmax(160px, 1fr) auto;
 }
 
+.payment-edit-confirm .ant-modal-content {
+  border: 1px solid var(--color-border);
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.48);
+}
+
+.payment-edit-form {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.payment-edit-form label {
+  display: grid;
+  gap: 7px;
+}
+
+.payment-edit-form label > span {
+  color: var(--color-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.payment-edit-form .ant-input,
+.payment-edit-form .ant-input-number {
+  min-height: 40px;
+}
+
 .finance-inline-form .ant-form-item {
   margin-bottom: 0;
 }
