@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Alert, Button, DatePicker, Form, Input, InputNumber, Modal, Space, Switch, Table, Tabs, Tag, message } from 'antd';
+import { Alert, Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Switch, Table, Tabs, Tag, message } from 'antd';
 import dayjs from 'dayjs';
-import { Check, CircleDollarSign, Download, Edit3, LockKeyhole, Search, X } from 'lucide-react';
+import { Check, CircleDollarSign, Download, Edit3, LockKeyhole, Printer, Search, X } from 'lucide-react';
 import {
   CashClosure,
   Debtor,
@@ -18,10 +18,13 @@ import {
   useGetStudentsQuery,
   useGetStudentFinanceQuery,
   useGetPaymentsHistoryQuery,
+  useGetBrandingSettingsQuery,
   useReversePaymentMutation,
   useUpdatePaymentMutation,
 } from '../../services/api';
 import PaymentMethodSelector from '../../components/PaymentMethodSelector';
+import BrandIdentity from '../../components/BrandIdentity';
+import { getCourseBrand } from '../../config/branding';
 import { API_BASE_URL } from '../../config/env';
 import { useAuth } from '../../auth/AuthContext';
 
@@ -35,6 +38,12 @@ type StudentPaymentFormValues = {
   method: PaymentMethod;
   isAdvance?: boolean;
   note?: string;
+};
+
+type PaymentReceipt = {
+  payment: Payment;
+  studentName: string;
+  subject?: string;
 };
 
 const paymentMethodLabels: Record<PaymentMethod, string> = {
@@ -146,8 +155,12 @@ export default function PaymentsPage() {
   const [selectedDebtor, setSelectedDebtor] = useState<Debtor | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('cash');
   const [reportRange, setReportRange] = useState<[dayjs.Dayjs, dayjs.Dayjs]>([dayjs().startOf('month'), dayjs()]);
+  const [reportPaymentPage, setReportPaymentPage] = useState(1);
+  const [reportPaymentMethod, setReportPaymentMethod] = useState<PaymentMethod | undefined>();
+  const [reportPaymentSearch, setReportPaymentSearch] = useState('');
   const [studentSearch, setStudentSearch] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [receipt, setReceipt] = useState<PaymentReceipt | null>(null);
   const enteredPaymentAmount = Form.useWatch('amount', multiMonthPaymentForm) || 0;
   const { data, isError, isFetching } = useGetPaymentsDashboardQuery();
   const { data: debtorsResponse, isFetching: isDebtorsFetching } = useGetDebtorsQuery();
@@ -159,6 +172,15 @@ export default function PaymentsPage() {
   const { data: studentsResponse, isFetching: isStudentsFetching } = useGetStudentsQuery({ search: studentSearch.trim() || undefined, limit: 20, view: 'current' });
   const { data: selectedFinance, isFetching: isSelectedFinanceFetching } = useGetStudentFinanceQuery(selectedStudent?.id || '', { skip: !selectedStudent });
   const { data: paymentHistory, isFetching: isHistoryFetching } = useGetPaymentsHistoryQuery({ page: 1, limit: 100 });
+  const { data: branding } = useGetBrandingSettingsQuery();
+  const { data: reportPayments, isFetching: isReportPaymentsFetching } = useGetPaymentsHistoryQuery({
+    ...reportParams,
+    page: reportPaymentPage,
+    limit: 20,
+    method: reportPaymentMethod,
+    search: reportPaymentSearch.trim() || undefined,
+    status: 'active',
+  });
   const [reversePayment] = useReversePaymentMutation();
   const [updatePayment] = useUpdatePaymentMutation();
 
@@ -182,7 +204,8 @@ export default function PaymentsPage() {
   async function submitStudentPayment(values: StudentPaymentFormValues) {
     if (!selectedStudent) return;
     try {
-      await createPayment({ studentId: selectedStudent.id, body: { ...values, note: values.note?.trim() || '' } }).unwrap();
+      const payment = await createPayment({ studentId: selectedStudent.id, body: { ...values, note: values.note?.trim() || '' } }).unwrap();
+      setReceipt({ payment, studentName: selectedStudent.fullName, subject: selectedStudent.group?.subject });
       studentPaymentForm.resetFields();
       studentPaymentForm.setFieldsValue({ method: 'cash', isAdvance: false });
       message.success(values.isAdvance ? 'Oldindan to‘lov saqlandi' : 'To‘lov saqlandi');
@@ -263,7 +286,7 @@ export default function PaymentsPage() {
     if (!selectedDebtor) return;
 
     try {
-      await createPayment({
+      const payment = await createPayment({
         studentId: selectedDebtor.studentId,
         body: {
           amount: values.amount,
@@ -271,6 +294,7 @@ export default function PaymentsPage() {
           note: values.note?.trim() || "Bir nechta oy uchun to'lov",
         },
       }).unwrap();
+      setReceipt({ payment, studentName: selectedDebtor.fullName, subject: selectedDebtor.subject });
       message.success("To'lov eng eski qarzlardan boshlab taqsimlandi");
       closeDebtorPaymentModal();
     } catch (error) {
@@ -283,7 +307,7 @@ export default function PaymentsPage() {
     if (!selectedDebtor) return;
 
     try {
-      await createPayment({
+      const payment = await createPayment({
         studentId: selectedDebtor.studentId,
         body: {
           amount: month.debtAmount,
@@ -293,6 +317,7 @@ export default function PaymentsPage() {
           note: `${month.month} oyi uchun to'lov`,
         },
       }).unwrap();
+      setReceipt({ payment, studentName: selectedDebtor.fullName, subject: selectedDebtor.subject });
       message.success("To'lov saqlandi");
       closeDebtorPaymentModal();
     } catch (error) {
@@ -473,25 +498,68 @@ export default function PaymentsPage() {
             key: 'report',
             label: 'Hisobot',
             children: (
-              <div className="dashboard-panel">
+              <div className="dashboard-panel payments-report-panel">
                 <Space wrap className="page-actions">
-                  <DatePicker.RangePicker value={reportRange} format="DD.MM.YYYY" allowClear={false} onChange={(values) => { if (values?.[0] && values[1]) setReportRange([values[0], values[1]]); }} />
+                  <DatePicker.RangePicker value={reportRange} format="DD.MM.YYYY" allowClear={false} onChange={(values) => { if (values?.[0] && values[1]) { setReportRange([values[0], values[1]]); setReportPaymentPage(1); } }} />
                   <Button icon={<Download size={16} />} onClick={exportReport}>CSV yuklash</Button>
                 </Space>
-                <div className="dashboard-kpi-grid">
+                <div className="dashboard-kpi-grid payments-report-kpi-grid">
                   <div className="payments-stat"><span>Kirim</span><strong>{formatMoney(report?.income)}</strong><small>{report?.paymentsCount || 0} ta to‘lov</small></div>
                   <div className="payments-stat"><span>Xarajat</span><strong>{formatMoney(report?.expense)}</strong><small>{report?.expensesCount || 0} ta xarajat</small></div>
                   <div className="payments-stat"><span>Sof natija</span><strong>{formatMoney(report?.net)}</strong></div>
                   <div className="payments-stat"><span>Jami qarz</span><strong>{formatMoney(report?.debt)}</strong></div>
                 </div>
                 {isReportFetching ? <p>Hisobot yangilanmoqda...</p> : null}
+                <Space wrap className="page-actions payments-report-filters">
+                  <Select
+                    allowClear
+                    placeholder="To'lov usuli"
+                    value={reportPaymentMethod}
+                    onChange={(method) => { setReportPaymentMethod(method); setReportPaymentPage(1); }}
+                    options={(Object.entries(paymentMethodLabels) as [PaymentMethod, string][]).map(([value, label]) => ({ value, label }))}
+                    style={{ minWidth: 180 }}
+                  />
+                  <Input
+                    allowClear
+                    prefix={<Search size={17} />}
+                    placeholder="O'quvchi yoki telefon"
+                    value={reportPaymentSearch}
+                    onChange={(event) => { setReportPaymentSearch(event.target.value); setReportPaymentPage(1); }}
+                    style={{ width: 260 }}
+                  />
+                </Space>
+                <Table
+                  rowKey="id"
+                  size="small"
+                  loading={isReportPaymentsFetching}
+                  dataSource={reportPayments?.data || []}
+                  scroll={{ x: 800 }}
+                  pagination={{
+                    current: reportPaymentPage,
+                    pageSize: 20,
+                    total: reportPayments?.pagination.total || 0,
+                    showSizeChanger: false,
+                    showTotal: (total) => `Jami ${total} ta to'lov`,
+                    onChange: setReportPaymentPage,
+                  }}
+                  locale={{ emptyText: "Tanlangan davrda to'lov topilmadi" }}
+                  columns={[
+                    { title: 'Sana', dataIndex: 'paidAt', render: (value) => dayjs(value).format('DD.MM.YYYY HH:mm') },
+                    { title: "O'quvchi", render: (_value, record: PaymentHistoryItem) => record.student?.fullName || '-' },
+                    { title: 'Telefon', render: (_value, record: PaymentHistoryItem) => record.student?.phone || '-' },
+                    { title: 'Summa', dataIndex: 'amount', render: formatMoney },
+                    { title: 'Usul', dataIndex: 'method', render: (value: PaymentMethod) => paymentMethodLabels[value] || value },
+                    { title: 'Kiritgan', dataIndex: 'createdBy', render: (value) => value?.fullName || '-' },
+                    { title: 'Izoh', dataIndex: 'note', render: (value) => value || '-' },
+                  ]}
+                />
               </div>
             ),
           },
         ]}
       />
 
-      <Modal title={selectedStudent ? `${selectedStudent.fullName} — to‘lovlar` : 'O‘quvchi to‘lovlari'} open={Boolean(selectedStudent)} onCancel={() => setSelectedStudent(null)} footer={null} width={1000}>
+      <Modal className="student-payment-modal" title={selectedStudent ? `${selectedStudent.fullName} — to‘lovlar` : 'O‘quvchi to‘lovlari'} open={Boolean(selectedStudent)} onCancel={() => setSelectedStudent(null)} footer={null} width={1100}>
         {selectedStudent ? (
           <>
             <div className="finance-summary">
@@ -649,6 +717,38 @@ export default function PaymentsPage() {
                 },
               ]}
             />
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal
+        title="To'lov cheki"
+        open={Boolean(receipt)}
+        onCancel={() => setReceipt(null)}
+        footer={[
+          <Button key="close" onClick={() => setReceipt(null)}>Yopish</Button>,
+          <Button key="print" type="primary" icon={<Printer size={16} />} onClick={() => window.print()}>Chop etish</Button>,
+        ]}
+        width={420}
+      >
+        {receipt ? (
+          <div className="receipt-print-area">
+            <div className="receipt-paper">
+              <BrandIdentity brand={getCourseBrand(receipt.subject, branding)} variant="receipt" />
+              <div className="receipt-divider" />
+              <div className="receipt-row"><span>Chek</span><strong>#{receipt.payment.id.slice(-8).toUpperCase()}</strong></div>
+              <div className="receipt-row"><span>Sana</span><strong>{dayjs(receipt.payment.paidAt).format('DD.MM.YYYY HH:mm')}</strong></div>
+              <div className="receipt-row"><span>O'quvchi</span><strong>{receipt.studentName}</strong></div>
+              {receipt.payment.allocations.length ? (
+                <div className="receipt-row"><span>Oy</span><strong>{receipt.payment.allocations.map((item) => item.month).join(', ')}</strong></div>
+              ) : null}
+              <div className="receipt-row"><span>Usul</span><strong>{paymentMethodLabels[receipt.payment.method]}</strong></div>
+              {receipt.payment.note ? <div className="receipt-row"><span>Izoh</span><strong>{receipt.payment.note}</strong></div> : null}
+              <div className="receipt-divider" />
+              <div className="receipt-row receipt-total"><span>To'landi</span><strong>{formatMoney(receipt.payment.amount)}</strong></div>
+              <div className="receipt-divider" />
+              <p className="receipt-footer">To'lovingiz uchun rahmat</p>
+            </div>
           </div>
         ) : null}
       </Modal>

@@ -710,6 +710,16 @@ body {
   gap: 12px;
 }
 
+.payments-report-kpi-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 12px;
+  margin-bottom: 20px;
+}
+
+.payments-report-filters {
+  margin-bottom: 12px;
+}
+
 .dashboard-kpi {
   min-height: 146px;
   padding: 14px;
@@ -1286,6 +1296,10 @@ body {
   border-radius: 8px;
 }
 
+.student-payment-modal .finance-inline-form {
+  grid-template-columns: minmax(240px, 1.3fr) minmax(140px, 0.7fr) 130px minmax(160px, 1fr) auto;
+}
+
 .finance-inline-form .ant-form-item {
   margin-bottom: 0;
 }
@@ -1601,11 +1615,12 @@ body {
 .receipt-paper {
   width: 80mm;
   min-height: 120mm;
-  padding: 6mm;
+  padding: 3mm;
   background: #ffffff;
   color: #111318;
   font-family: Arial, sans-serif;
-  font-size: 12px;
+  font-size: 15px;
+  line-height: 1.35;
 }
 
 .receipt-paper h3 {
@@ -1616,8 +1631,8 @@ body {
 
 .brand-identity-receipt {
   flex-direction: column;
-  gap: 5px;
-  margin-bottom: 10px;
+  gap: 6px;
+  margin-bottom: 12px;
   text-align: center;
 }
 
@@ -1664,7 +1679,13 @@ body {
 }
 
 .brand-identity-receipt .brand-title {
-  font-size: 18px;
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+.brand-identity-receipt .brand-subtitle {
+  font-size: 14px;
+  line-height: 1.2;
 }
 
 .receipt-paper p {
@@ -1673,7 +1694,7 @@ body {
 }
 
 .receipt-divider {
-  margin: 10px 0;
+  margin: 12px 0;
   border-top: 1px dashed #111318;
 }
 
@@ -1681,7 +1702,7 @@ body {
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  margin: 7px 0;
+  margin: 9px 0;
 }
 
 .receipt-row span {
@@ -1689,15 +1710,18 @@ body {
 }
 
 .receipt-row strong {
+  max-width: 68%;
   text-align: right;
+  overflow-wrap: anywhere;
 }
 
 .receipt-total {
-  font-size: 14px;
+  font-size: 18px;
 }
 
 .receipt-footer {
-  font-size: 12px;
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .settings-page {
@@ -1949,6 +1973,26 @@ body {
   }
 }
 
+@media (max-width: 900px) {
+  .student-payment-modal .finance-inline-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .student-payment-modal .finance-submit-item {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 640px) {
+  .student-payment-modal .finance-inline-form {
+    grid-template-columns: 1fr;
+  }
+
+  .student-payment-modal .finance-submit-item {
+    grid-column: auto;
+  }
+}
+
 @media print {
   @page {
     size: 80mm auto;
@@ -1974,7 +2018,7 @@ body {
   .receipt-paper {
     width: 80mm;
     min-height: auto;
-    padding: 5mm;
+    padding: 2mm;
     box-shadow: none;
   }
 }

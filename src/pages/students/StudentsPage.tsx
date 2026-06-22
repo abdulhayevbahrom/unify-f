@@ -210,7 +210,7 @@ export default function StudentsPage() {
   const [historyStudent, setHistoryStudent] = useState<Student | null>(null);
   const [selectedPaymentBalance, setSelectedPaymentBalance] = useState<StudentMonthlyBalance | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('cash');
-  const [receipt, setReceipt] = useState<{ payment: Payment; balance: StudentMonthlyBalance; student: Student } | null>(null);
+  const [receipt, setReceipt] = useState<{ payment: Payment; monthLabel?: string; student: Student } | null>(null);
   const [showSecondaryPhone, setShowSecondaryPhone] = useState(false);
   const [showClosedGroups, setShowClosedGroups] = useState(false);
   const [showClosedMoveGroups, setShowClosedMoveGroups] = useState(false);
@@ -409,7 +409,7 @@ export default function StudentsPage() {
     if (!financeStudent) return;
 
     try {
-      await createPayment({
+      const payment = await createPayment({
         studentId: financeStudent.id,
         body: {
           amount: values.amount,
@@ -417,6 +417,7 @@ export default function StudentsPage() {
           note: values.note || '',
         },
       }).unwrap();
+      setReceipt({ payment, student: financeStudent });
       paymentForm.resetFields();
       paymentForm.setFieldsValue({ method: 'cash' });
       message.success("To'lov saqlandi");
@@ -445,7 +446,7 @@ export default function StudentsPage() {
         },
       }).unwrap();
 
-      setReceipt({ payment, balance: selectedPaymentBalance, student: financeStudent });
+      setReceipt({ payment, monthLabel: selectedPaymentBalance.month, student: financeStudent });
       setSelectedPaymentBalance(null);
       message.success("To'lov saqlandi");
     } catch (error) {
@@ -1289,10 +1290,12 @@ export default function StudentsPage() {
                 <span>O'quvchi</span>
                 <strong>{receipt.student.fullName}</strong>
               </div>
-              <div className="receipt-row">
-                <span>Oy</span>
-                <strong>{receipt.balance.month}</strong>
-              </div>
+              {receipt.monthLabel || receipt.payment.allocations.length ? (
+                <div className="receipt-row">
+                  <span>Oy</span>
+                  <strong>{receipt.monthLabel || receipt.payment.allocations.map((item) => item.month).join(', ')}</strong>
+                </div>
+              ) : null}
               <div className="receipt-row">
                 <span>Usul</span>
                 <strong>{getPaymentMethodLabel(receipt.payment.method)}</strong>

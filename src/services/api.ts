@@ -237,6 +237,7 @@ export type Payment = {
 
 export type PaymentHistoryItem = Payment & {
   student: { id: string; fullName: string; phone: string } | null;
+  createdBy: { id: string; fullName: string } | null;
 };
 
 export type CashClosure = {
@@ -299,6 +300,7 @@ export type Debtor = {
   fullName: string;
   phone: string;
   secondaryPhone: string;
+  subject: string;
   groupName: string;
   totalDebt: number;
   months: { balanceId: string; groupId: string; groupName: string; month: string; debtAmount: number }[];
@@ -818,6 +820,7 @@ export const api = createApi({
         { type: "Finance", id: "DEBTORS" },
         { type: "PaymentsDashboard", id: "CURRENT" },
         { type: "Dashboard", id: "CURRENT" },
+        { type: "Dashboard", id: "REPORT" },
         { type: "Student", id: arg.studentId },
         { type: "Student", id: "LIST" },
         { type: "Finance", id: "PAYMENT_HISTORY" },
@@ -827,17 +830,27 @@ export const api = createApi({
       query: ({ paymentId, reason }) => ({ url: `/finance/payments/${paymentId}/reverse`, method: "PUT", body: { reason } }),
       invalidatesTags: (_result, _error, arg) => [
         { type: "Finance", id: arg.studentId }, { type: "Finance", id: "DEBTORS" },
-        { type: "PaymentsDashboard", id: "CURRENT" }, { type: "Dashboard", id: "CURRENT" }, { type: "Finance", id: "PAYMENT_HISTORY" },
+        { type: "PaymentsDashboard", id: "CURRENT" }, { type: "Dashboard", id: "CURRENT" }, { type: "Dashboard", id: "REPORT" }, { type: "Finance", id: "PAYMENT_HISTORY" },
       ],
     }),
     updatePayment: builder.mutation<Payment, { paymentId: string; studentId: string; body: PaymentPayload }>({
       query: ({ paymentId, body }) => ({ url: `/finance/payments/${paymentId}`, method: "PUT", body }),
       invalidatesTags: (_result, _error, arg) => [
         { type: "Finance", id: arg.studentId }, { type: "Finance", id: "DEBTORS" },
-        { type: "PaymentsDashboard", id: "CURRENT" }, { type: "Dashboard", id: "CURRENT" }, { type: "Finance", id: "PAYMENT_HISTORY" },
+        { type: "PaymentsDashboard", id: "CURRENT" }, { type: "Dashboard", id: "CURRENT" }, { type: "Dashboard", id: "REPORT" }, { type: "Finance", id: "PAYMENT_HISTORY" },
       ],
     }),
-    getPaymentsHistory: builder.query<PaginatedResponse<PaymentHistoryItem>, { studentId?: string; page?: number; limit?: number }>({
+    getPaymentsHistory: builder.query<PaginatedResponse<PaymentHistoryItem>, {
+      studentId?: string;
+      page?: number;
+      limit?: number;
+      dateFrom?: string;
+      dateTo?: string;
+      method?: PaymentMethod;
+      search?: string;
+      status?: Payment["status"];
+      cashStatus?: Payment["cashStatus"];
+    }>({
       query: (params) => ({ url: "/finance/payments", params }),
       providesTags: [{ type: "Finance", id: "PAYMENT_HISTORY" }],
     }),
@@ -952,6 +965,7 @@ export const api = createApi({
       invalidatesTags: [
         { type: "Expense", id: "LIST" },
         { type: "Dashboard", id: "CURRENT" },
+        { type: "Dashboard", id: "REPORT" },
       ],
     }),
     updateExpense: builder.mutation<
@@ -967,6 +981,7 @@ export const api = createApi({
         { type: "Expense", id: arg.id },
         { type: "Expense", id: "LIST" },
         { type: "Dashboard", id: "CURRENT" },
+        { type: "Dashboard", id: "REPORT" },
       ],
     }),
     deleteExpense: builder.mutation<{ message: string; id: string }, string>({
@@ -977,6 +992,7 @@ export const api = createApi({
       invalidatesTags: [
         { type: "Expense", id: "LIST" },
         { type: "Dashboard", id: "CURRENT" },
+        { type: "Dashboard", id: "REPORT" },
       ],
     }),
     getEmployees: builder.query<
