@@ -1306,7 +1306,7 @@ export default function StudentsPage() {
                 <strong>{formatMoney(receipt.payment.amount)}</strong>
               </div>
               <div className="receipt-divider" />
-              <p className="receipt-footer">To'lovingiz uchun rahmat</p>
+              <p className="receipt-footer">{getCourseBrand(receipt.student.group?.subject, branding).receiptFooter}</p>
             </div>
           </div>
         ) : null}

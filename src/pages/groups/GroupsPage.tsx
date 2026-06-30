@@ -222,6 +222,9 @@ export default function GroupsPage({ archivedOnly = false }: GroupsPageProps) {
       startTime: formatTime(values.startTime),
       endTime: formatTime(values.endTime),
       startDate: values.startDate?.format('YYYY-MM-DD') || '',
+      status: editingGroup ? values.status : 'active',
+      isEnrollmentOpen: editingGroup ? values.isEnrollmentOpen : true,
+      priceChangeReason: editingGroup ? values.priceChangeReason : undefined,
     };
 
     try {
@@ -295,6 +298,8 @@ export default function GroupsPage({ archivedOnly = false }: GroupsPageProps) {
     setFilters({});
     setPage(1);
   }
+
+  const isEditingGroup = Boolean(editingGroup);
 
   return (
     <section className="page">
@@ -504,14 +509,18 @@ export default function GroupsPage({ archivedOnly = false }: GroupsPageProps) {
             <Form.Item name="subject" label="Fan" rules={[{ required: true, message: 'Fan tanlang' }]}>
               <Select options={subjectOptions} onChange={() => form.setFieldValue('teacherId', '')} />
             </Form.Item>
-            <Form.Item name="status" label="Holat" rules={[{ required: true, message: 'Holat tanlang' }]}>
-              <Select options={statusOptions} />
-            </Form.Item>
+            {isEditingGroup ? (
+              <Form.Item name="status" label="Holat" rules={[{ required: true, message: 'Holat tanlang' }]}>
+                <Select options={statusOptions} />
+              </Form.Item>
+            ) : null}
           </div>
 
-          <Form.Item name="isEnrollmentOpen" label="Qabul ochiq" valuePropName="checked">
-            <Switch checkedChildren="Ochiq" unCheckedChildren="Yopiq" />
-          </Form.Item>
+          {isEditingGroup ? (
+            <Form.Item name="isEnrollmentOpen" label="Qabul ochiq" valuePropName="checked">
+              <Switch checkedChildren="Ochiq" unCheckedChildren="Yopiq" />
+            </Form.Item>
+          ) : null}
 
           <Form.Item name="teacherId" label="O'qituvchi" rules={[{ required: true, message: "O'qituvchi tanlang" }]}>
             <Select
@@ -550,9 +559,11 @@ export default function GroupsPage({ archivedOnly = false }: GroupsPageProps) {
             </Form.Item>
           </div>
 
-          <Form.Item name="priceChangeReason" label="Narx o'zgarish sababi">
-            <Input placeholder={editingGroup ? "Masalan: yangi oy uchun narx o'zgardi" : 'Boshlangich narx'} />
-          </Form.Item>
+          {isEditingGroup ? (
+            <Form.Item name="priceChangeReason" label="Narx o'zgarish sababi">
+              <Input placeholder="Masalan: yangi oy uchun narx o'zgardi" />
+            </Form.Item>
+          ) : null}
 
           <Form.Item
             name="lessonDays"

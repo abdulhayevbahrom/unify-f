@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Alert, Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Switch, Table, Tabs, Tag, message } from 'antd';
 import dayjs from 'dayjs';
-import { Check, CircleDollarSign, Download, Edit3, LockKeyhole, Printer, Search, Trash2, X } from 'lucide-react';
+import { Check, CircleDollarSign, Download, Edit3, Eye, LockKeyhole, Printer, Search, Trash2, X } from 'lucide-react';
 import {
   CashClosure,
   Debtor,
@@ -15,6 +15,7 @@ import {
   Payment,
   PaymentHistoryItem,
   Student,
+  useGetGroupsQuery,
   useGetStudentsQuery,
   useGetStudentFinanceQuery,
   useGetPaymentsHistoryQuery,
@@ -154,7 +155,12 @@ export default function PaymentsPage() {
   const [multiMonthPaymentForm] = Form.useForm<MultiMonthPaymentFormValues>();
   const [studentPaymentForm] = Form.useForm<StudentPaymentFormValues>();
   const [selectedDebtor, setSelectedDebtor] = useState<Debtor | null>(null);
+  const [debtorDetails, setDebtorDetails] = useState<Debtor | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('cash');
+  const [debtorSearch, setDebtorSearch] = useState('');
+  const [debtorGroupId, setDebtorGroupId] = useState<string | undefined>();
+  const [debtorSubject, setDebtorSubject] = useState<string | undefined>();
+  const [debtorMinDebt, setDebtorMinDebt] = useState<number | undefined>();
   const [reportRange, setReportRange] = useState<[dayjs.Dayjs, dayjs.Dayjs]>([dayjs().startOf('month'), dayjs()]);
   const [reportPaymentPage, setReportPaymentPage] = useState(1);
   const [reportPaymentMethod, setReportPaymentMethod] = useState<PaymentMethod | undefined>();
@@ -162,12 +168,20 @@ export default function PaymentsPage() {
   const [studentSearch, setStudentSearch] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [receipt, setReceipt] = useState<PaymentReceipt | null>(null);
+  const [reviewingClosure, setReviewingClosure] = useState<{ closureId: string; status: 'approved' | 'rejected' } | null>(null);
   const enteredPaymentAmount = Form.useWatch('amount', multiMonthPaymentForm) || 0;
   const { data, isError, isFetching } = useGetPaymentsDashboardQuery();
-  const { data: debtorsResponse, isFetching: isDebtorsFetching } = useGetDebtorsQuery();
+  const { data: groupsResponse, isFetching: isGroupsFetching } = useGetGroupsQuery({ limit: 100 });
+  const debtorQuery = {
+    search: debtorSearch.trim() || undefined,
+    groupId: debtorGroupId || undefined,
+    subject: debtorSubject || undefined,
+    minDebt: debtorMinDebt || undefined,
+  };
+  const { data: debtorsResponse, isFetching: isDebtorsFetching } = useGetDebtorsQuery(debtorQuery);
   const [closeCashRegister, { isLoading: isClosing }] = useCloseCashRegisterMutation();
   const [createPayment, { isLoading: isPaymentSaving }] = useCreatePaymentMutation();
-  const [reviewCashClosure, { isLoading: isReviewing }] = useReviewCashClosureMutation();
+  const [reviewCashClosure] = useReviewCashClosureMutation();
   const reportParams = { dateFrom: reportRange[0].format('YYYY-MM-DD'), dateTo: reportRange[1].format('YYYY-MM-DD') };
   const { data: report, isFetching: isReportFetching } = useGetFinancialReportQuery(reportParams);
   const { data: studentsResponse, isFetching: isStudentsFetching } = useGetStudentsQuery({ search: studentSearch.trim() || undefined, limit: 20, view: 'current' });
@@ -184,6 +198,16 @@ export default function PaymentsPage() {
   });
   const [reversePayment] = useReversePaymentMutation();
   const [updatePayment] = useUpdatePaymentMutation();
+  const debtorGroupOptions = (groupsResponse?.data || []).map((group) => ({ value: group.id, label: `${group.name} — ${group.subject}` }));
+  const debtorSubjectOptions = Array.from(new Set((groupsResponse?.data || []).map((group) => group.subject).filter(Boolean))).map((subject) => ({ value: subject, label: subject }));
+
+  function isReviewingClosure(closureId: string, status: 'approved' | 'rejected') {
+    return reviewingClosure?.closureId === closureId && reviewingClosure.status === status;
+  }
+
+  function isSiblingDisabled(closureId: string, status: 'approved' | 'rejected') {
+    return reviewingClosure?.closureId === closureId && !isReviewingClosure(closureId, status);
+  }
 
   async function exportReport() {
     try {
@@ -194,12 +218,49 @@ export default function PaymentsPage() {
       const url = URL.createObjectURL(await response.blob());
       const link = document.createElement('a');
       link.href = url;
-      link.download = `moliyaviy-hisobot-${reportParams.dateFrom}-${reportParams.dateTo}.csv`;
+      link.download = `moliyaviy-hisobot-${reportParams.dateFrom}-${reportParams.dateTo}.xlsx`;
       link.click();
       URL.revokeObjectURL(url);
     } catch (error) {
       message.error(error instanceof Error ? error.message : 'Eksportda xatolik');
     }
+  }
+
+  async function exportDebtors() {
+    try {
+      const params = new URLSearchParams();
+      if (debtorQuery.search) params.set('search', debtorQuery.search);
+      if (debtorQuery.groupId) params.set('groupId', debtorQuery.groupId);
+      if (debtorQuery.subject) params.set('subject', debtorQuery.subject);
+      if (debtorQuery.minDebt) params.set('minDebt', String(debtorQuery.minDebt));
+      const response = await fetch(`${API_BASE_URL}/finance/debtors/export${params.toString() ? `?${params.toString()}` : ''}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('sab_auth_token') || ''}` },
+      });
+      if (!response.ok) throw new Error('Eksportni yuklab bo‘lmadi');
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'qarzdorlar.xlsx';
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : 'Eksportda xatolik');
+    }
+  }
+
+  function clearDebtorFilters() {
+    setDebtorSearch('');
+    setDebtorGroupId(undefined);
+    setDebtorSubject(undefined);
+    setDebtorMinDebt(undefined);
+  }
+
+  function openDebtorDetails(debtor: Debtor) {
+    setDebtorDetails(debtor);
+  }
+
+  function closeDebtorDetails() {
+    setDebtorDetails(null);
   }
 
   async function submitStudentPayment(values: StudentPaymentFormValues) {
@@ -217,7 +278,7 @@ export default function PaymentsPage() {
   }
 
   function editPayment(record: Payment, studentId = selectedStudent?.id) {
-    if (!studentId) return;
+    if (user?.role !== 'owner' || !studentId) return;
     let amount = record.amount;
     let method = record.method;
     let note = record.note;
@@ -246,7 +307,7 @@ export default function PaymentsPage() {
   }
 
   function cancelPayment(record: Payment, studentId = selectedStudent?.id) {
-    if (!studentId) return;
+    if (user?.role !== 'owner' || !studentId) return;
     let reason = '';
     modal.confirm({
       title: record.cashStatus === 'approved' ? 'To‘lovni qaytarish' : 'To‘lovni bekor qilish',
@@ -304,12 +365,19 @@ export default function PaymentsPage() {
   }
 
   async function reviewClosure(closure: CashClosure, status: 'approved' | 'rejected') {
+    if (isReviewingClosure(closure.id, status)) return;
+
+    setReviewingClosure({ closureId: closure.id, status });
     try {
       await reviewCashClosure({ closureId: closure.id, status }).unwrap();
       message.success(status === 'approved' ? 'Kassa tasdiqlandi' : 'Kassa bekor qilindi');
     } catch (error) {
       const apiError = error as { data?: { message?: string } };
       message.error(apiError.data?.message || 'Amal bajarilmadi');
+    } finally {
+      setReviewingClosure((current) => (
+        current?.closureId === closure.id && current.status === status ? null : current
+      ));
     }
   }
 
@@ -469,8 +537,21 @@ export default function PaymentsPage() {
                       width: 150,
                       render: (_value, record: CashClosure) => (
                         <Space>
-                          <Button size="small" icon={<Check size={15} />} loading={isReviewing} onClick={() => reviewClosure(record, 'approved')} />
-                          <Button size="small" danger icon={<X size={15} />} loading={isReviewing} onClick={() => reviewClosure(record, 'rejected')} />
+                          <Button
+                            size="small"
+                            icon={<Check size={15} />}
+                            loading={isReviewingClosure(record.id, 'approved')}
+                            disabled={isSiblingDisabled(record.id, 'approved')}
+                            onClick={() => reviewClosure(record, 'approved')}
+                          />
+                          <Button
+                            size="small"
+                            danger
+                            icon={<X size={15} />}
+                            loading={isReviewingClosure(record.id, 'rejected')}
+                            disabled={isSiblingDisabled(record.id, 'rejected')}
+                            onClick={() => reviewClosure(record, 'rejected')}
+                          />
                         </Space>
                       ),
                     },
@@ -500,42 +581,93 @@ export default function PaymentsPage() {
             key: 'debtors',
             label: 'Qarzdorlar',
             children: (
-              <Table
-                rowKey="studentId"
-                size="small"
-                loading={isDebtorsFetching}
-                dataSource={debtorsResponse?.data || []}
-                pagination={false}
-                scroll={{ x: 820 }}
-                columns={[
-                  { title: "F.I.Sh", dataIndex: 'fullName' },
-                  { title: 'Telefon', dataIndex: 'phone', render: (_value, record: Debtor) => <PhoneCell debtor={record} /> },
-                  { title: 'Guruh', dataIndex: 'groupName' },
-                  { title: 'Umumiy qarz', dataIndex: 'totalDebt', render: (value) => <span className="danger-text">{formatMoney(value)}</span> },
-                  {
-                    title: 'Oylar',
-                    dataIndex: 'months',
-                    render: (months: Debtor['months']) => (
-                      <Space wrap>
-                        {months.map((item) => (
-                          <Tag key={item.balanceId} color="red">
-                            {item.groupName} / {item.month}: {formatMoney(item.debtAmount)}
-                          </Tag>
-                        ))}
-                      </Space>
-                    ),
-                  },
-                  {
-                    title: "To'lov",
-                    width: 110,
-                    render: (_value, record: Debtor) => (
-                      <Button size="small" type="primary" icon={<CircleDollarSign size={15} />} onClick={() => openDebtorPaymentModal(record)}>
-                        To'lash
-                      </Button>
-                    ),
-                  },
-                ]}
-              />
+              <div className="dashboard-panel payments-report-panel">
+                <Space wrap className="page-actions payments-report-filters">
+                  <Input
+                    allowClear
+                    prefix={<Search size={17} />}
+                    placeholder="F.I.Sh yoki telefon"
+                    value={debtorSearch}
+                    onChange={(event) => setDebtorSearch(event.target.value)}
+                    style={{ width: 260 }}
+                  />
+                  <Select
+                    allowClear
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder="Guruh"
+                    loading={isGroupsFetching}
+                    options={debtorGroupOptions}
+                    value={debtorGroupId}
+                    onChange={setDebtorGroupId}
+                    style={{ minWidth: 240 }}
+                  />
+                  <Select
+                    allowClear
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder="Fan"
+                    loading={isGroupsFetching}
+                    options={debtorSubjectOptions}
+                    value={debtorSubject}
+                    onChange={setDebtorSubject}
+                    style={{ minWidth: 180 }}
+                  />
+                  <InputNumber
+                    min={1}
+                    allowClear
+                    placeholder="Min. qarz"
+                    value={debtorMinDebt}
+                    onChange={(value) => setDebtorMinDebt(value ?? undefined)}
+                    formatter={(value) => `${value || ''}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
+                    parser={(value) => Number(value?.replace(/\s/g, '') || 0)}
+                    style={{ width: 180 }}
+                  />
+                  <Button icon={<X size={16} />} onClick={clearDebtorFilters}>
+                    Tozalash
+                  </Button>
+                  <Button icon={<Download size={16} />} onClick={exportDebtors}>
+                    Yuklab olish
+                  </Button>
+                </Space>
+                <Table
+                  rowKey="studentId"
+                  size="small"
+                  loading={isDebtorsFetching}
+                  dataSource={debtorsResponse?.data || []}
+                  pagination={false}
+                  scroll={{ x: 820 }}
+                  columns={[
+                    { title: "F.I.Sh", dataIndex: 'fullName' },
+                    { title: 'Telefon', dataIndex: 'phone', render: (_value, record: Debtor) => <PhoneCell debtor={record} /> },
+                    { title: 'Guruh', dataIndex: 'groupName' },
+                    { title: 'Umumiy qarz', dataIndex: 'totalDebt', render: (value) => <span className="danger-text">{formatMoney(value)}</span> },
+                    {
+                      title: 'Oylar',
+                      dataIndex: 'months',
+                      width: 100,
+                      render: (_months: Debtor['months'], record: Debtor) => (
+                        <Button
+                          type="text"
+                          size="small"
+                          icon={<Eye size={16} />}
+                          title={`${record.months.length} ta qarz yozuvi`}
+                          onClick={() => openDebtorDetails(record)}
+                        />
+                      ),
+                    },
+                    {
+                      title: "To'lov",
+                      width: 110,
+                      render: (_value, record: Debtor) => (
+                        <Button size="small" type="primary" icon={<CircleDollarSign size={15} />} onClick={() => openDebtorPaymentModal(record)}>
+                          To'lash
+                        </Button>
+                      ),
+                    },
+                  ]}
+                />
+              </div>
             ),
           },
           {
@@ -545,7 +677,7 @@ export default function PaymentsPage() {
               <div className="dashboard-panel payments-report-panel">
                 <Space wrap className="page-actions">
                   <DatePicker.RangePicker value={reportRange} format="DD.MM.YYYY" allowClear={false} onChange={(values) => { if (values?.[0] && values[1]) { setReportRange([values[0], values[1]]); setReportPaymentPage(1); } }} />
-                  <Button icon={<Download size={16} />} onClick={exportReport}>CSV yuklash</Button>
+                  <Button icon={<Download size={16} />} onClick={exportReport}>Yuklash</Button>
                 </Space>
                 <div className="dashboard-kpi-grid payments-report-kpi-grid">
                   <div className="payments-stat"><span>Kirim</span><strong>{formatMoney(report?.income)}</strong><small>{report?.paymentsCount || 0} ta to‘lov</small></div>
@@ -635,6 +767,35 @@ export default function PaymentsPage() {
                 { title: 'Amallar', width: 220, render: (_value, record: Payment) => renderPaymentActions(record, selectedStudent.id) },
               ]} /> },
             ]} />
+          </>
+        ) : null}
+        </Modal>
+
+      <Modal
+        title={debtorDetails ? `${debtorDetails.fullName} — qarz tafsilotlari` : 'Qarz tafsilotlari'}
+        open={Boolean(debtorDetails)}
+        onCancel={closeDebtorDetails}
+        footer={null}
+        width={760}
+      >
+        {debtorDetails ? (
+          <>
+            <div className="finance-summary">
+              <div><span>Telefon</span><strong>{debtorDetails.phone}{debtorDetails.secondaryPhone ? ` / ${debtorDetails.secondaryPhone}` : ''}</strong></div>
+              <div><span>Guruh</span><strong>{debtorDetails.groupName || '-'}</strong></div>
+              <div><span>Umumiy qarz</span><strong className="danger-text">{formatMoney(debtorDetails.totalDebt)}</strong></div>
+            </div>
+            <Table
+              rowKey="balanceId"
+              size="small"
+              pagination={false}
+              dataSource={debtorDetails.months}
+              columns={[
+                { title: 'Guruh', dataIndex: 'groupName' },
+                { title: 'Oy', dataIndex: 'month' },
+                { title: 'Qarz', dataIndex: 'debtAmount', render: (value) => <span className="danger-text">{formatMoney(value)}</span> },
+              ]}
+            />
           </>
         ) : null}
       </Modal>
@@ -792,7 +953,7 @@ export default function PaymentsPage() {
               <div className="receipt-divider" />
               <div className="receipt-row receipt-total"><span>To'landi</span><strong>{formatMoney(receipt.payment.amount)}</strong></div>
               <div className="receipt-divider" />
-              <p className="receipt-footer">To'lovingiz uchun rahmat</p>
+              <p className="receipt-footer">{getCourseBrand(receipt.subject, branding).receiptFooter}</p>
             </div>
           </div>
         ) : null}

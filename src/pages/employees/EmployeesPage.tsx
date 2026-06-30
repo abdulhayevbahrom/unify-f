@@ -88,6 +88,7 @@ export default function EmployeesPage() {
       username: values.username.trim().toLowerCase(),
       permissions: values.role === 'owner' ? allPermissions : values.permissions,
       teacherId: values.role === 'teacher' ? values.teacherId : null,
+      ...(values.role === 'reception' && !values.permissions?.includes('reception') ? { permissions: [...(values.permissions || []), 'reception'] } : {}),
       password: values.password || undefined,
     };
 
@@ -165,8 +166,8 @@ export default function EmployeesPage() {
             title: 'Rol',
             dataIndex: 'role',
             render: (value) => {
-              const labels = { owner: 'Owner', employee: 'Hodim', teacher: "O'qituvchi" } as const;
-              return <Tag color={value === 'owner' ? 'magenta' : value === 'teacher' ? 'cyan' : 'blue'}>{labels[value as keyof typeof labels]}</Tag>;
+              const labels = { owner: 'Owner', employee: 'Hodim', teacher: "O'qituvchi", reception: 'Qabulxona' } as const;
+              return <Tag color={value === 'owner' ? 'magenta' : value === 'teacher' ? 'cyan' : value === 'reception' ? 'gold' : 'blue'}>{labels[value as keyof typeof labels]}</Tag>;
             },
           },
           {
@@ -257,6 +258,7 @@ export default function EmployeesPage() {
                 options={[
                   { label: 'Hodim', value: 'employee' },
                   { label: "O'qituvchi", value: 'teacher' },
+                  { label: 'Qabulxona', value: 'reception' },
                   ...(user?.role === 'owner' ? [{ label: 'Owner', value: 'owner' as const }] : []),
                 ]}
               />

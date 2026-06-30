@@ -45,11 +45,14 @@ const genderOptions = [
   { label: 'Ayol', value: 'female' },
 ];
 
-const defaultValues: TeacherPayload = {
+type TeacherFormValues = Omit<TeacherPayload, 'status'> & {
+  status?: TeacherPayload['status'];
+};
+
+const defaultValues: TeacherFormValues = {
   fullName: '',
   subject: 'IT',
   phone: '',
-  telegram: '',
   gender: 'male',
   experienceYears: 0,
   monthlySalary: 0,
@@ -73,7 +76,7 @@ function TeacherStatusTag({ status }: { status: Teacher['status'] }) {
 }
 
 export default function TeachersPage() {
-  const [form] = Form.useForm<TeacherPayload>();
+  const [form] = Form.useForm<TeacherFormValues>();
   const [filters, setFilters] = useState<TeacherFilters>({});
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
@@ -112,7 +115,6 @@ export default function TeachersPage() {
       fullName: teacher.fullName,
       subject: teacher.subject,
       phone: teacher.phone,
-      telegram: teacher.telegram || '',
       gender: teacher.gender,
       experienceYears: teacher.experienceYears,
       monthlySalary: teacher.monthlySalary || 0,
@@ -130,13 +132,16 @@ export default function TeachersPage() {
     form.resetFields();
   }
 
-  async function handleSubmit(values: TeacherPayload) {
+  async function handleSubmit(values: TeacherFormValues) {
     try {
       if (editingTeacher) {
-        await updateTeacher({ id: editingTeacher.id, body: values }).unwrap();
+        await updateTeacher({
+          id: editingTeacher.id,
+          body: { ...values, status: values.status || editingTeacher.status },
+        }).unwrap();
         message.success("O'qituvchi ma'lumoti yangilandi");
       } else {
-        await createTeacher(values).unwrap();
+        await createTeacher({ ...values, status: 'active' }).unwrap();
         message.success("O'qituvchi qo'shildi");
       }
 
@@ -177,7 +182,7 @@ export default function TeachersPage() {
         <Input
           allowClear
           prefix={<Search size={16} />}
-          placeholder="F.I.Sh, telefon yoki Telegram bo'yicha qidirish"
+          placeholder="F.I.Sh, telefon bo'yicha qidirish"
           value={filters.search}
           onChange={(event) => {
             setPage(1);
@@ -213,6 +218,7 @@ export default function TeachersPage() {
       </div>
 
       <Table
+        className="teachers-table"
         rowKey="id"
         size="small"
         loading={isFetching}
@@ -231,11 +237,6 @@ export default function TeachersPage() {
           { title: "F.I.Sh", dataIndex: 'fullName' },
           { title: 'Fan', dataIndex: 'subject' },
           { title: 'Telefon', dataIndex: 'phone' },
-          {
-            title: 'Telegram',
-            dataIndex: 'telegram',
-            render: (value) => value || '-',
-          },
           {
             title: 'Tajriba',
             dataIndex: 'experienceYears',
@@ -296,13 +297,15 @@ export default function TeachersPage() {
             <Input placeholder="Masalan: Ali Karimov" />
           </Form.Item>
 
-          <div className="form-grid">
+          <div className={editingTeacher ? 'form-grid' : 'single-field-row'}>
             <Form.Item name="subject" label="Fan" rules={[{ required: true, message: 'Fan tanlang' }]}>
               <Select options={subjectOptions} />
             </Form.Item>
-            <Form.Item name="status" label="Holat" rules={[{ required: true, message: 'Holat tanlang' }]}>
-              <Select options={statusOptions} />
-            </Form.Item>
+            {editingTeacher ? (
+              <Form.Item name="status" label="Holat" rules={[{ required: true, message: 'Holat tanlang' }]}>
+                <Select options={statusOptions} />
+              </Form.Item>
+            ) : null}
           </div>
 
           <div className="form-grid">
@@ -318,18 +321,6 @@ export default function TeachersPage() {
               ]}
             >
               <Input placeholder="+998 90 123 45 67" />
-            </Form.Item>
-            <Form.Item
-              name="telegram"
-              label="Telegram"
-              rules={[
-                {
-                  pattern: /^$|^@[A-Za-z0-9_]{5,32}$/,
-                  message: "Telegram @username ko'rinishida bo'lishi kerak",
-                },
-              ]}
-            >
-              <Input placeholder="@username" />
             </Form.Item>
           </div>
 

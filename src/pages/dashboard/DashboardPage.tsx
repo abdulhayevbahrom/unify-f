@@ -1,4 +1,4 @@
-import { DatePicker, Progress, Table, Tag } from 'antd';
+import { DatePicker, Progress, Skeleton, Table, Tag } from 'antd';
 import {
   CategoryScale,
   Chart as ChartJS,
@@ -75,12 +75,14 @@ function KpiCard({
   detail,
   tone,
   icon,
+  loading = false,
 }: {
   title: string;
   value: string;
   detail: string;
   tone: 'income' | 'expense' | 'payroll' | 'debt' | 'neutral' | 'success';
   icon: ReactNode;
+  loading?: boolean;
 }) {
   return (
     <div className={`dashboard-kpi dashboard-kpi-${tone}`}>
@@ -88,8 +90,17 @@ function KpiCard({
         <div className="dashboard-kpi-icon">{icon}</div>
         <span>{title}</span>
       </div>
-      <strong>{value}</strong>
-      <small>{detail}</small>
+      {loading ? (
+        <>
+          <Skeleton.Input active size="small" className="dashboard-kpi-skeleton-value" />
+          <Skeleton.Input active size="small" className="dashboard-kpi-skeleton-detail" />
+        </>
+      ) : (
+        <>
+          <strong>{value}</strong>
+          <small>{detail}</small>
+        </>
+      )}
     </div>
   );
 }
@@ -97,6 +108,7 @@ function KpiCard({
 export default function DashboardPage() {
   const [selectedMonth, setSelectedMonth] = useState(dayjs().format('YYYY-MM'));
   const { data, isFetching } = useGetDashboardQuery({ month: selectedMonth });
+  const isDashboardLoading = isFetching && !data;
   const summary = data?.summary;
   const paymentCoverage = getPercent(summary?.allocatedPaidAmount, summary?.chargedAmount);
   const netTone = Number(summary?.netAmount || 0) >= 0 ? 'success' : 'expense';
@@ -109,8 +121,8 @@ export default function DashboardPage() {
       {
         label: 'Kirim',
         data: trendItems.map((item) => item.incomeAmount),
-        borderColor: '#20c997',
-        backgroundColor: 'rgba(32, 201, 151, 0.12)',
+        borderColor: '#10B981',
+        backgroundColor: 'rgba(16, 185, 129, 0.12)',
         tension: 0.35,
         fill: true,
         pointRadius: 2,
@@ -119,7 +131,7 @@ export default function DashboardPage() {
       {
         label: 'Chiqim',
         data: trendItems.map((item) => item.outflowAmount),
-        borderColor: '#f59e0b',
+        borderColor: '#F59E0B',
         backgroundColor: 'rgba(245, 158, 11, 0.08)',
         tension: 0.35,
         fill: false,
@@ -129,8 +141,8 @@ export default function DashboardPage() {
       {
         label: 'Xarajat',
         data: trendItems.map((item) => item.expenseAmount),
-        borderColor: '#ff4d4f',
-        backgroundColor: 'rgba(255, 77, 79, 0.08)',
+        borderColor: '#EF4444',
+        backgroundColor: 'rgba(239, 68, 68, 0.08)',
         tension: 0.35,
         fill: false,
         pointRadius: 2,
@@ -150,7 +162,7 @@ export default function DashboardPage() {
         position: 'top' as const,
         align: 'end' as const,
         labels: {
-          color: '#aeb4c0',
+          color: '#6B7280',
           boxWidth: 10,
           boxHeight: 10,
           usePointStyle: true,
@@ -167,20 +179,29 @@ export default function DashboardPage() {
     scales: {
       x: {
         grid: {
-          color: 'rgba(48, 53, 64, 0.45)',
+          color: 'rgba(229, 231, 235, 0.95)',
         },
         ticks: {
-          color: '#aeb4c0',
-          maxTicksLimit: 12,
+          color: '#6B7280',
+          autoSkip: false,
+          maxRotation: 0,
+          minRotation: 0,
+          padding: 8,
+          font: {
+            size: 11,
+          },
+          callback(value, index) {
+            return trendItems[index]?.day ?? value;
+          },
         },
       },
       y: {
         beginAtZero: true,
         grid: {
-          color: 'rgba(48, 53, 64, 0.65)',
+          color: 'rgba(229, 231, 235, 0.95)',
         },
         ticks: {
-          color: '#aeb4c0',
+          color: '#6B7280',
           callback(value: string | number) {
             return getChartMoneyLabel(Number(value));
           },
@@ -204,48 +225,54 @@ export default function DashboardPage() {
       </div>
 
       <div className="dashboard-kpi-grid">
-        <KpiCard title="Bugungi kirim" value={formatMoney(data?.today.incomeAmount)} detail="Faqat tasdiqlangan kassa" tone="income" icon={<ArrowUpRight size={20} />} />
-        <KpiCard title="Bugungi xarajat" value={formatMoney(data?.today.expenseAmount)} detail="Bugun kiritilgan xarajatlar" tone="expense" icon={<ReceiptText size={20} />} />
-        <KpiCard title="Bugungi natija" value={formatMoney(data?.today.netAmount)} detail="Kirim - xarajat" tone={Number(data?.today.netAmount || 0) >= 0 ? 'success' : 'expense'} icon={<Banknote size={20} />} />
+        <KpiCard loading={isDashboardLoading} title="Bugungi kirim" value={formatMoney(data?.today.incomeAmount)} detail="Faqat tasdiqlangan kassa" tone="income" icon={<ArrowUpRight size={20} />} />
+        <KpiCard loading={isDashboardLoading} title="Bugungi xarajat" value={formatMoney(data?.today.expenseAmount)} detail="Bugun kiritilgan xarajatlar" tone="expense" icon={<ReceiptText size={20} />} />
+        <KpiCard loading={isDashboardLoading} title="Bugungi natija" value={formatMoney(data?.today.netAmount)} detail="Kirim - xarajat" tone={Number(data?.today.netAmount || 0) >= 0 ? 'success' : 'expense'} icon={<Banknote size={20} />} />
       </div>
 
       <div className="dashboard-kpi-grid">
+          <KpiCard
+            loading={isDashboardLoading}
+            title="Oylik kirim"
+            value={formatMoney(summary?.incomeAmount)}
+            detail={`${formatNumber(data?.payments.count)} ta to'lov`}
+            tone="income"
+            icon={<ArrowUpRight size={20} />}
+          />
         <KpiCard
-          title="Kirim"
-          value={formatMoney(summary?.incomeAmount)}
-          detail={`${formatNumber(data?.payments.count)} ta to'lov`}
-          tone="income"
-          icon={<ArrowUpRight size={20} />}
-        />
-        <KpiCard
-          title="Xarajat"
+          loading={isDashboardLoading}
+          title="Oylik xarajat"
           value={formatMoney(summary?.expenseAmount)}
           detail={`${formatNumber(data?.expenses.count)} ta xarajat`}
           tone="expense"
           icon={<ReceiptText size={20} />}
         />
         <KpiCard
-          title="Oylik chiqim"
+          loading={isDashboardLoading}
+          title="Maosh chiqimi"
           value={formatMoney(summary?.payrollPaidAmount)}
           detail={`Hisoblangan: ${formatMoney(summary?.salaryAccruedAmount)}`}
           tone="payroll"
           icon={<CircleDollarSign size={20} />}
         />
         <KpiCard
-          title="Sof natija"
+          loading={isDashboardLoading}
+          title="Foyda"
           value={formatMoney(summary?.netAmount)}
           detail="Kirim - xarajat - berilgan oylik"
           tone={netTone}
           icon={Number(summary?.netAmount || 0) >= 0 ? <ArrowUpRight size={20} /> : <ArrowDownRight size={20} />}
         />
         <KpiCard
-          title="Oy uchun hisob"
+          loading={isDashboardLoading}
+          title="Oylik hisob"
           value={formatMoney(summary?.chargedAmount)}
-          detail={`To'langan: ${formatMoney(summary?.allocatedPaidAmount)} (${paymentCoverage}%)`}
+          detail={`Bu oy olinishi kerak bo'lgan summa. To'langan: ${formatMoney(summary?.allocatedPaidAmount)} (${paymentCoverage}%)`}
           tone="neutral"
           icon={<Banknote size={20} />}
         />
         <KpiCard
+          loading={isDashboardLoading}
           title="Jami qarz"
           value={formatMoney(summary?.totalDebtAmount)}
           detail={`Shu oy: ${formatMoney(summary?.monthDebtAmount)}`}
@@ -330,7 +357,7 @@ export default function DashboardPage() {
                   dataIndex: 'paymentPercentage',
                   render: (value) => (
                     <div className="dashboard-progress-cell">
-                      <Progress percent={Number(value || 0)} size="small" strokeColor="#3a86ff" trailColor="#303540" />
+                      <Progress percent={Number(value || 0)} size="small" strokeColor="#4F46E5" trailColor="#E5E7EB" />
                     </div>
                   ),
                 },
@@ -386,8 +413,8 @@ export default function DashboardPage() {
                   <Progress
                     percent={getPercent(amount, data?.payments.totalAmount)}
                     showInfo={false}
-                    strokeColor="#20c997"
-                    trailColor="#303540"
+                    strokeColor="#10B981"
+                    trailColor="#E5E7EB"
                   />
                 </div>
               ))}

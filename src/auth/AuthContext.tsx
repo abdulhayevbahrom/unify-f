@@ -8,7 +8,7 @@ export type AuthUser = {
   id: string;
   fullName: string;
   username: string;
-  role: 'owner' | 'employee' | 'teacher';
+  role: 'owner' | 'employee' | 'teacher' | 'reception';
   teacherId: string | null;
   permissions: Permission[];
   status: 'active' | 'inactive';

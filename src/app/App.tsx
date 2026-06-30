@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { Badge, Button, Dropdown, Layout, Menu, Modal, Spin, Tooltip, Typography, message } from 'antd';
 import dayjs from 'dayjs';
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { useDispatch } from 'react-redux';
@@ -85,10 +85,19 @@ function NotificationBell() {
   const { user } = useAuth();
   const dispatch = useDispatch();
   const { data } = useGetNotificationsQuery(undefined, { skip: !user });
-  const [reviewCashClosure, { isLoading: isReviewing }] = useReviewCashClosureMutation();
+  const [reviewCashClosure] = useReviewCashClosureMutation();
   const [markNotificationRead] = useMarkNotificationReadMutation();
+  const [reviewingClosure, setReviewingClosure] = useState<{ closureId: string; status: 'approved' | 'rejected' } | null>(null);
   const notifications = data?.data || [];
   const ownerCanReview = user?.role === 'owner';
+
+  function isReviewingClosure(closureId: string, status: 'approved' | 'rejected') {
+    return reviewingClosure?.closureId === closureId && reviewingClosure.status === status;
+  }
+
+  function isSiblingDisabled(closureId: string, status: 'approved' | 'rejected') {
+    return reviewingClosure?.closureId === closureId && !isReviewingClosure(closureId, status);
+  }
 
   useEffect(() => {
     const token = localStorage.getItem('sab_auth_token');
@@ -102,11 +111,19 @@ function NotificationBell() {
 
     socket.on('notification:new', (payload: { notification?: AppNotification }) => {
       message.info(payload.notification?.message || 'Yangi bildirishnoma');
-      dispatch(api.util.invalidateTags([{ type: 'Notification', id: 'LIST' }, { type: 'PaymentsDashboard', id: 'CURRENT' }]));
+      dispatch(api.util.invalidateTags([
+        { type: 'Notification', id: 'LIST' },
+        { type: 'PaymentsDashboard', id: 'CURRENT' },
+        { type: 'Dashboard', id: 'CURRENT' },
+      ]));
     });
 
     socket.on('cash-closure:reviewed', () => {
-      dispatch(api.util.invalidateTags([{ type: 'Notification', id: 'LIST' }, { type: 'PaymentsDashboard', id: 'CURRENT' }]));
+      dispatch(api.util.invalidateTags([
+        { type: 'Notification', id: 'LIST' },
+        { type: 'PaymentsDashboard', id: 'CURRENT' },
+        { type: 'Dashboard', id: 'CURRENT' },
+      ]));
     });
 
     return () => {
@@ -115,6 +132,9 @@ function NotificationBell() {
   }, [dispatch, user]);
 
   async function reviewClosure(notification: AppNotification, closure: CashClosure, status: 'approved' | 'rejected') {
+    if (isReviewingClosure(closure.id, status)) return;
+
+    setReviewingClosure({ closureId: closure.id, status });
     try {
       await reviewCashClosure({ closureId: closure.id, status }).unwrap();
       await markNotificationRead(notification.id).unwrap().catch(() => undefined);
@@ -122,6 +142,10 @@ function NotificationBell() {
     } catch (error) {
       const apiError = error as { data?: { message?: string } };
       message.error(apiError.data?.message || 'Amal bajarilmadi');
+    } finally {
+      setReviewingClosure((current) => (
+        current?.closureId === closure.id && current.status === status ? null : current
+      ));
     }
   }
 
@@ -159,7 +183,6 @@ function NotificationBell() {
       ),
       okText: 'Tasdiqlash',
       cancelText: 'Yopish',
-      okButtonProps: { loading: isReviewing },
       onOk: () => reviewClosure(notification, closure, 'approved'),
     });
   }
@@ -186,7 +209,11 @@ function NotificationBell() {
             }}
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
-                openClosureReview(notification);
+                if (notification.type === 'cash_closure' && ownerCanReview) {
+                  openClosureReview(notification);
+                } else {
+                  markNotificationRead(notification.id);
+                }
               }
             }}
           >
@@ -199,7 +226,8 @@ function NotificationBell() {
                   size="small"
                   type="primary"
                   icon={<Check size={14} />}
-                  loading={isReviewing}
+                  loading={isReviewingClosure(notification.closure.id, 'approved')}
+                  disabled={isSiblingDisabled(notification.closure.id, 'approved')}
                   onClick={() => reviewClosure(notification, notification.closure as CashClosure, 'approved')}
                 >
                   Tasdiqlash
@@ -208,7 +236,8 @@ function NotificationBell() {
                   size="small"
                   danger
                   icon={<X size={14} />}
-                  loading={isReviewing}
+                  loading={isReviewingClosure(notification.closure.id, 'rejected')}
+                  disabled={isSiblingDisabled(notification.closure.id, 'rejected')}
                   onClick={() => reviewClosure(notification, notification.closure as CashClosure, 'rejected')}
                 >
                   Rad etish

@@ -8,7 +8,6 @@ export type Teacher = {
   fullName: string;
   subject: string;
   phone: string;
-  telegram: string;
   gender: "male" | "female";
   experienceYears: number;
   monthlySalary: number;
@@ -45,13 +44,12 @@ export type TeacherPayload = {
   fullName: string;
   subject: string;
   phone: string;
-  telegram?: string;
   gender: Teacher["gender"];
   experienceYears: number;
   monthlySalary: number;
   salaryType: Teacher["salaryType"];
   salaryPercentage: number;
-  status: Teacher["status"];
+  status?: Teacher["status"];
   note?: string;
 };
 
@@ -306,6 +304,13 @@ export type Debtor = {
   months: { balanceId: string; groupId: string; groupName: string; month: string; debtAmount: number }[];
 };
 
+export type DebtorFilters = {
+  search?: string;
+  groupId?: string;
+  subject?: string;
+  minDebt?: number;
+};
+
 export type StudentPause = {
   id: string;
   studentId: string;
@@ -486,7 +491,7 @@ export type Employee = {
   id: string;
   fullName: string;
   username: string;
-  role: "owner" | "employee" | "teacher";
+  role: "owner" | "employee" | "teacher" | "reception";
   teacherId: string | null;
   permissions: Permission[];
   monthlySalary: number;
@@ -911,8 +916,8 @@ export const api = createApi({
       }),
       invalidatesTags: [{ type: "Notification", id: "LIST" }],
     }),
-    getDebtors: builder.query<{ data: Debtor[] }, void>({
-      query: () => "/finance/debtors",
+    getDebtors: builder.query<{ data: Debtor[] }, DebtorFilters | void>({
+      query: (params) => ({ url: "/finance/debtors", params }),
       providesTags: [{ type: "Finance", id: "DEBTORS" }],
     }),
     closeCashRegister: builder.mutation<CashClosure, void>({
@@ -922,6 +927,7 @@ export const api = createApi({
       }),
       invalidatesTags: [
         { type: "PaymentsDashboard", id: "CURRENT" },
+        { type: "Dashboard", id: "CURRENT" },
         { type: "Finance", id: "LIST" },
         { type: "Notification", id: "LIST" },
       ],
@@ -937,6 +943,7 @@ export const api = createApi({
       }),
       invalidatesTags: [
         { type: "PaymentsDashboard", id: "CURRENT" },
+        { type: "Dashboard", id: "CURRENT" },
         { type: "Notification", id: "LIST" },
       ],
     }),

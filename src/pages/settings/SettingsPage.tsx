@@ -2,7 +2,7 @@ import { Button, Card, Form, Input, Spin, Upload, message } from 'antd';
 import { Save, UploadCloud } from 'lucide-react';
 import { useEffect } from 'react';
 import BrandIdentity from '../../components/BrandIdentity';
-import { ACCOUNTING_BRAND, BrandingSettings, UNIFY_BRAND } from '../../config/branding';
+import { ACCOUNTING_BRAND, BrandingSettings, mergeBrand, UNIFY_BRAND } from '../../config/branding';
 import {
   useGetBrandingSettingsQuery,
   useUpdateBrandingSettingsMutation,
@@ -10,8 +10,8 @@ import {
 } from '../../services/api';
 
 type SettingsFormValues = {
-  unify: { name: string; subtitle: string };
-  accounting: { name: string; subtitle: string };
+  unify: { name: string; subtitle: string; receiptFooter: string };
+  accounting: { name: string; subtitle: string; receiptFooter: string };
 };
 
 const brandLabels = {
@@ -24,14 +24,18 @@ export default function SettingsPage() {
   const { data, isLoading } = useGetBrandingSettingsQuery();
   const [updateBranding, { isLoading: isSaving }] = useUpdateBrandingSettingsMutation();
   const [uploadLogo] = useUploadBrandLogoMutation();
-  const settings: BrandingSettings = data || { unify: UNIFY_BRAND, accounting: ACCOUNTING_BRAND };
+  const settings: BrandingSettings = {
+    unify: mergeBrand(UNIFY_BRAND, data?.unify),
+    accounting: mergeBrand(ACCOUNTING_BRAND, data?.accounting),
+    updatedAt: data?.updatedAt,
+  };
 
   useEffect(() => {
     form.setFieldsValue({
-      unify: { name: settings.unify.name, subtitle: settings.unify.subtitle },
-      accounting: { name: settings.accounting.name, subtitle: settings.accounting.subtitle },
+      unify: { name: settings.unify.name, subtitle: settings.unify.subtitle, receiptFooter: settings.unify.receiptFooter },
+      accounting: { name: settings.accounting.name, subtitle: settings.accounting.subtitle, receiptFooter: settings.accounting.receiptFooter },
     });
-  }, [form, settings.accounting.name, settings.accounting.subtitle, settings.unify.name, settings.unify.subtitle]);
+  }, [form, settings.accounting.name, settings.accounting.receiptFooter, settings.accounting.subtitle, settings.unify.name, settings.unify.receiptFooter, settings.unify.subtitle]);
 
   async function handleSave(values: SettingsFormValues) {
     try {
@@ -87,6 +91,9 @@ export default function SettingsPage() {
               </Form.Item>
               <Form.Item name={[brandKey, 'subtitle']} label="Qo‘shimcha yozuv">
                 <Input maxLength={160} />
+              </Form.Item>
+              <Form.Item name={[brandKey, 'receiptFooter']} label="Chek oxiridagi matn">
+                <Input maxLength={160} placeholder="Masalan: To'lovingiz uchun rahmat" />
               </Form.Item>
               <Upload {...uploadProps(brandKey)}>
                 <Button icon={<UploadCloud size={17} />}>Logo yuklash</Button>
