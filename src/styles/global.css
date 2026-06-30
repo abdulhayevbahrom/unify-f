@@ -307,22 +307,55 @@ body {
 .auth-page {
   padding: 24px;
   background:
-    radial-gradient(circle at 20% 10%, rgba(232, 63, 99, 0.16), transparent 34%),
-    radial-gradient(circle at 80% 90%, rgba(58, 134, 255, 0.12), transparent 32%),
-    var(--color-bg);
+    linear-gradient(135deg, rgba(10, 15, 30, 0.62), rgba(10, 15, 30, 0.38)),
+    radial-gradient(circle at 20% 10%, rgba(232, 63, 99, 0.18), transparent 34%),
+    radial-gradient(circle at 80% 90%, rgba(58, 134, 255, 0.16), transparent 32%),
+    url('/login-bg.jpg') center / cover no-repeat;
+  background-attachment: fixed;
 }
 
 .auth-card {
   width: min(430px, 100%);
   padding: 32px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  color: #f8fafc;
+  background: rgba(15, 23, 42, 0.64);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 14px;
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 .auth-card h2 {
   margin: 14px 0 2px;
+}
+
+.auth-card .ant-typography,
+.auth-card .ant-form-item-label > label {
+  color: rgba(248, 250, 252, 0.88);
+}
+
+.auth-card .brand-title {
+  color: #ffffff;
+}
+
+.auth-card .brand-subtitle {
+  color: rgba(226, 232, 240, 0.72);
+}
+
+.auth-card .ant-form-item-label > label {
+  font-weight: 500;
+}
+
+.auth-card .ant-input-affix-wrapper,
+.auth-card .ant-input,
+.auth-card .ant-input-password {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.auth-card .ant-input::placeholder,
+.auth-card .ant-input-password input::placeholder {
+  color: rgba(107, 114, 128, 0.85);
 }
 
 .auth-brand-mark {
